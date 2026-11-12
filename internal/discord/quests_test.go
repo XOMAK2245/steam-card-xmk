@@ -62,6 +62,41 @@ func TestDefaultHeaders(t *testing.T) {
 	}
 }
 
+func TestFilterQuests(t *testing.T) {
+	now := time.Now()
+	past := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	future := now.Add(24 * time.Hour).Format(time.RFC3339)
+
+	all := []Quest{
+		{ID: "active1", Config: QuestConfig{ExpiresAt: future}},
+		{ID: "expired1", Config: QuestConfig{ExpiresAt: past}},
+		{ID: "claimed1", Config: QuestConfig{ExpiresAt: future},
+			UserStatus: &QuestUserStatus{ClaimedAt: "2026-01-01T00:00:00Z"}},
+		{ID: "active2", Config: QuestConfig{ExpiresAt: ""}}, // no expiry = always active
+	}
+	// Populate IsClaimed
+	for i := range all {
+		all[i].PopulateMetrics()
+	}
+
+	active, claimed := filterQuests(all)
+
+	if len(active) != 2 {
+		t.Errorf("expected 2 active quests, got %d: %+v", len(active), active)
+	}
+	if len(claimed) != 1 {
+		t.Errorf("expected 1 claimed quest, got %d: %+v", len(claimed), claimed)
+	}
+	for _, q := range active {
+		if q.ID == "expired1" {
+			t.Errorf("expired quest should not be in active list")
+		}
+	}
+	if claimed[0].ID != "claimed1" {
+		t.Errorf("expected claimed1, got %s", claimed[0].ID)
+	}
+}
+
 func TestHeartbeatInterval(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		d := HeartbeatInterval()

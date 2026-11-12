@@ -48,7 +48,7 @@
     <h2 data-i18n="loginTitle">Sign in to Steam</h2>
     <div class="cols">
       <div>
-        <p data-i18n="qrHelp">Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.</p>
+        <p data-i18n="qrHelp">Scan the QR code with the Steam mobile app (Steam Guard → "Sign in with QR code"). No password is entered here.</p>
         <button id="btnQr" data-i18n="qrBtn">Show QR code</button>
         <div id="qrWrap" hidden><img id="qrImg" alt="QR" width="240" height="240"><div id="qrStatus"></div></div>
       </div>
@@ -81,6 +81,9 @@
   <div class="grid">
     <section class="card">
       <h2><span data-i18n="games">Games</span> <small id="gamesInfo"></small></h2>
+      <div class="search-bar">
+        <input id="steamSearch" class="search-input" type="search" data-i18n-placeholder="steamSearchPlaceholder" placeholder="Search by name or AppID…">
+      </div>
       <div class="tablewrap">
       <table>
         <thead><tr><th>AppID</th><th data-i18n="name">Game</th><th data-i18n="left">Cards left</th><th data-i18n="hours">Hours</th><th data-i18n="state">State</th></tr></thead>
@@ -150,7 +153,8 @@
       <span data-i18n="dqAutoEnroll">Auto-accept quests before starting</span>
     </label>
     <span class="spacer"></span>
-    <span id="dqSummary" style="color:var(--dim); font-size:12.5px;"></span>
+    <input id="dqSearch" class="search-input compact" type="search" data-i18n-placeholder="dqSearchPlaceholder" placeholder="Search quest…">
+    <span id="dqSummary" style="color:var(--dim); font-size:12.5px; white-space:nowrap;"></span>
   </section>
 
   <div class="grid">
@@ -159,6 +163,10 @@
       <div id="dqQuestList" class="quest-list">
         <div class="empty-hint" data-i18n="dqEmpty">No quests found or Discord not connected yet.</div>
       </div>
+      <details id="dqClaimedSection" hidden style="margin-top:14px;">
+        <summary class="claimed-summary" data-i18n="dqClaimedSection">Completed quests</summary>
+        <div id="dqClaimedList" class="quest-list" style="margin-top:10px;"></div>
+      </details>
     </section>
     <section class="card">
       <h2 data-i18n="log">Log</h2>

@@ -652,3 +652,57 @@ pre {
   color: var(--dim);
   font-size: 13px;
 }
+
+
+/* ---- Search bar ---- */
+.search-bar {
+  margin-bottom: 10px;
+}
+
+.search-input {
+  background: #10161f;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 12.5px;
+  padding: 6px 10px 6px 30px;
+  outline: none;
+  width: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238f98a0' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 9px center;
+  transition: border-color 0.15s;
+}
+
+.search-input.compact {
+  width: 180px;
+  padding: 5px 10px 5px 28px;
+  flex-shrink: 0;
+}
+
+.search-input:focus {
+  border-color: var(--acc);
+}
+
+.search-input::placeholder {
+  color: var(--dim);
+}
+
+/* ---- Claimed quests section ---- */
+.claimed-summary {
+  color: var(--dim);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+  letter-spacing: 0.2px;
+}
+
+.claimed-summary:hover {
+  color: var(--fg);
+}
+
+details[id="dqClaimedSection"] > .quest-list {
+  max-height: 40vh;
+}

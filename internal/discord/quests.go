@@ -68,6 +68,7 @@ type QuestReward struct {
 // QuestConfig holds quest metadata.
 type QuestConfig struct {
 	ExpiresAt    string          `json:"expires_at"`
+	StartsAt     string          `json:"starts_at"`
 	TaskConfig   QuestTaskConfig `json:"quest_task_config"`
 	TaskConfigV2 *TaskConfigV2   `json:"task_config_v2"`
 	RewardConfig QuestReward     `json:"reward_config"`
@@ -88,6 +89,8 @@ type Quest struct {
 	ProgressRatio float64 `json:"progress_ratio"` // 0.0 to 1.0
 	TaskName      string  `json:"task_name"`      // WATCH_VIDEO, PLAY_ON_DESKTOP, STREAM_ON_DESKTOP, etc.
 	IsVideo       bool    `json:"is_video"`
+	IsClaimed     bool    `json:"is_claimed"`  // already claimed (shown in completed section)
+	IsExpired     bool    `json:"is_expired"`  // quest is past its expiry date
 }
 
 // Name returns the human-readable quest name.
@@ -132,6 +135,11 @@ func (q *Quest) PopulateMetrics() {
 	q.TaskName = taskName
 	q.SecondsTarget = target
 	q.IsVideo = strings.Contains(taskName, "WATCH_VIDEO")
+
+	// Mark claimed status
+	if q.UserStatus != nil && q.UserStatus.ClaimedAt != "" {
+		q.IsClaimed = true
+	}
 
 	// 3. Determine SecondsDone
 	var done float64 = 0
@@ -259,6 +267,30 @@ type questsResponse struct {
 	Quests []Quest `json:"quests"`
 }
 
+// filterQuests removes expired quests and marks claimed ones.
+// It returns (active, claimed) slices.
+func filterQuests(all []Quest) (active []Quest, claimed []Quest) {
+	now := time.Now()
+	for _, q := range all {
+		// Check expiry from config.expires_at
+		if q.Config.ExpiresAt != "" {
+			if exp, err := time.Parse(time.RFC3339, q.Config.ExpiresAt); err == nil {
+				if now.After(exp) {
+					q.IsExpired = true
+					continue // skip expired quests entirely
+				}
+			}
+		}
+		// Separate claimed quests
+		if q.IsClaimed {
+			claimed = append(claimed, q)
+		} else {
+			active = append(active, q)
+		}
+	}
+	return active, claimed
+}
+
 // ParseQuests decodes Discord quests from JSON bytes, supporting both {"quests": [...]} and raw array [...].
 func ParseQuests(data []byte) ([]Quest, error) {
 	var quests []Quest
@@ -285,7 +317,8 @@ func ParseQuests(data []byte) ([]Quest, error) {
 	return quests, nil
 }
 
-// FetchQuests retrieves available quests for the authenticated user.
+// FetchQuests retrieves and filters available quests for the authenticated user.
+// Active (unclaimed, non-expired) quests come first; claimed quests are appended at the end (marked IsClaimed=true).
 func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 	resp, err := c.doReq(ctx, "GET", "quests/@me", nil)
 	if err != nil {
@@ -303,14 +336,20 @@ func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 		return nil, fmt.Errorf("discord: read quests: %w", err)
 	}
 
-	quests, err := ParseQuests(b)
+	all, err := ParseQuests(b)
 	if err != nil {
 		return nil, fmt.Errorf("discord: parse quests: %w", err)
 	}
-	if quests == nil {
-		quests = []Quest{}
-	}
-	return quests, nil
+
+	// Filter: separate active from claimed; drop expired entirely
+	active, claimed := filterQuests(all)
+
+	// Combine: active first, then claimed (for display in "completed" section)
+	result := make([]Quest, 0, len(active)+len(claimed))
+	result = append(result, active...)
+	result = append(result, claimed...)
+
+	return result, nil
 }
 
 // Enroll accepts a quest (with realistic delay).
