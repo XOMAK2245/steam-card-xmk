@@ -40,3 +40,18 @@ func TestDefaultAndLegacyMigration(t *testing.T) {
 		t.Fatalf("failed to migrate sequential config: %+v", set3)
 	}
 }
+
+func TestDiscordConfigPreserved(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", d)
+	store := Load()
+	store.Update(func(c *Store) {
+		c.Discord.Token = "test_discord_token_xyz"
+	})
+
+	store2 := Load()
+	if store2.Discord.Token != "test_discord_token_xyz" {
+		t.Fatalf("Discord token not preserved: %q", store2.Discord.Token)
+	}
+}
+

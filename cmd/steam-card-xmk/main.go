@@ -67,6 +67,7 @@ func main() {
 	cfg := config.Load()
 	eng := farm.New(cfg)
 	srv := &web.Server{Eng: eng, Cfg: cfg, Quit: make(chan struct{})}
+	srv.InitDiscord()
 	var quitOnce sync.Once
 	quit := func() { quitOnce.Do(func() { close(srv.Quit) }) }
 	srv.QuitFn = quit

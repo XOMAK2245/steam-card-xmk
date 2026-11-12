@@ -2,19 +2,23 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
 
 	"github.com/XOMAK2245/steam-card-xmk/internal/auth"
 	"github.com/XOMAK2245/steam-card-xmk/internal/config"
+	"github.com/XOMAK2245/steam-card-xmk/internal/discord"
 	"github.com/XOMAK2245/steam-card-xmk/internal/farm"
 )
 
@@ -27,6 +31,23 @@ type Server struct {
 	QR     auth.QRLogin
 	Quit   chan struct{}
 	QuitFn func() // safe to call repeatedly; falls back to closing Quit
+
+	// Discord quest support
+	Discord       *discord.Client
+	discordMu     sync.Mutex
+	discordQuests map[string]context.CancelFunc // questID → cancel
+}
+
+// InitDiscord creates the Discord client if a token is configured.
+func (s *Server) InitDiscord() {
+	sess, _ := s.Cfg.Snapshot()
+	_ = sess
+	// Read discord config directly
+	s.Cfg.Update(func(c *config.Store) {
+		if c.Discord.Token != "" {
+			s.Discord = discord.NewClient(c.Discord.Token, s.Eng.Logf)
+		}
+	})
 }
 
 func (s *Server) Handler() http.Handler {
@@ -116,7 +137,170 @@ func (s *Server) Handler() http.Handler {
 		s.Eng.FetchOnce()
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+
+	// ---- Discord Quest endpoints ----
+	s.registerDiscordRoutes(mux)
+
 	return guard(mux)
+}
+
+func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
+	// Save / validate Discord token
+	mux.HandleFunc("POST /api/discord/token", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Token string `json:"token"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.Token == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		c := discord.NewClient(in.Token, s.Eng.Logf)
+		_, err := c.FetchQuests(r.Context())
+		if err != nil {
+			if errors.Is(err, discord.ErrUnauthorized) {
+				http.Error(w, "Invalid Discord token", 401)
+			} else {
+				http.Error(w, err.Error(), 502)
+			}
+			return
+		}
+		s.Cfg.Update(func(cfg *config.Store) { cfg.Discord.Token = in.Token })
+		s.Discord = c
+		s.Eng.Logf("[Discord] Token saved and validated")
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// Remove Discord token
+	mux.HandleFunc("POST /api/discord/logout", func(w http.ResponseWriter, r *http.Request) {
+		// Stop any running quests
+		s.discordMu.Lock()
+		for id, cancel := range s.discordQuests {
+			cancel()
+			delete(s.discordQuests, id)
+		}
+		s.discordMu.Unlock()
+		s.Discord = nil
+		s.Cfg.Update(func(cfg *config.Store) { cfg.Discord.Token = "" })
+		s.Eng.Logf("[Discord] Token removed")
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// List quests
+	mux.HandleFunc("GET /api/discord/quests", func(w http.ResponseWriter, r *http.Request) {
+		if s.Discord == nil {
+			writeJSON(w, []struct{}{})
+			return
+		}
+		quests, err := s.Discord.FetchQuests(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), 502)
+			return
+		}
+		writeJSON(w, quests)
+	})
+
+	// Start quest(s)
+	mux.HandleFunc("POST /api/discord/start", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			QuestID string `json:"questId"`
+			All     bool   `json:"all"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		if s.Discord == nil {
+			http.Error(w, "no discord token", 400)
+			return
+		}
+		quests, err := s.Discord.FetchQuests(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), 502)
+			return
+		}
+		var toRun []discord.Quest
+		for _, q := range quests {
+			// Skip already claimed quests
+			if q.UserStatus != nil && q.UserStatus.ClaimedAt != "" {
+				continue
+			}
+			if in.All || q.ID == in.QuestID {
+				toRun = append(toRun, q)
+			}
+		}
+		s.discordMu.Lock()
+		if s.discordQuests == nil {
+			s.discordQuests = map[string]context.CancelFunc{}
+		}
+		for _, q := range toRun {
+			if _, running := s.discordQuests[q.ID]; running {
+				continue
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			s.discordQuests[q.ID] = cancel
+			go s.runDiscordQuest(ctx, q)
+		}
+		s.discordMu.Unlock()
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// Stop all quests
+	mux.HandleFunc("POST /api/discord/stop", func(w http.ResponseWriter, r *http.Request) {
+		s.discordMu.Lock()
+		for id, cancel := range s.discordQuests {
+			cancel()
+			delete(s.discordQuests, id)
+		}
+		s.discordMu.Unlock()
+		s.Eng.Logf("[Discord] All quests stopped")
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// Discord state
+	mux.HandleFunc("GET /api/discord/state", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, s.getDiscordState())
+	})
+}
+
+func (s *Server) runDiscordQuest(ctx context.Context, quest discord.Quest) {
+	defer func() {
+		s.discordMu.Lock()
+		delete(s.discordQuests, quest.ID)
+		s.discordMu.Unlock()
+		s.publishDiscordState()
+	}()
+
+	s.Eng.Logf("[Discord] Starting quest: %s", quest.Name())
+	err := s.Discord.RunQuest(ctx, quest, func(elapsed, total time.Duration) {
+		s.publishDiscordState()
+	})
+	if err != nil && !errors.Is(err, context.Canceled) {
+		s.Eng.Logf("[Discord] Quest %s error: %v", quest.Name(), err)
+	} else if err == nil {
+		s.Eng.Logf("[Discord] Quest %s completed!", quest.Name())
+	}
+}
+
+func (s *Server) getDiscordState() map[string]any {
+	s.discordMu.Lock()
+	running := make([]string, 0, len(s.discordQuests))
+	for id := range s.discordQuests {
+		running = append(running, id)
+	}
+	s.discordMu.Unlock()
+	return map[string]any{
+		"hasToken": s.Discord != nil,
+		"running":  running,
+	}
+}
+
+func (s *Server) publishDiscordState() {
+	b, _ := json.Marshal(s.getDiscordState())
+	s.Eng.PublishRaw(farm.Event{Type: "discord", Data: string(b)})
 }
 
 // guard blocks DNS-rebinding (Host check) and cross-site POSTs (custom header).

@@ -30,11 +30,16 @@ type Settings struct {
 	WorkerDir   string   `json:"workerDir,omitempty"`
 }
 
+type Discord struct {
+	Token string `json:"token,omitempty"`
+}
+
 type Store struct {
 	mu       sync.Mutex
 	dir      string
 	Session  Session  `json:"session"`
 	Settings Settings `json:"settings"`
+	Discord  Discord  `json:"discord,omitempty"`
 }
 
 func Default() Settings {

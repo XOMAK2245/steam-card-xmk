@@ -99,3 +99,26 @@ func TestPostNeedsHeader(t *testing.T) {
 		t.Errorf("expected 403, got %d", r.StatusCode)
 	}
 }
+
+func TestDiscordEndpointsInitial(t *testing.T) {
+	ts := newTestServer(t)
+	body, code := get(t, ts.URL+"/api/discord/state")
+	if code != 200 {
+		t.Fatalf("code=%d, want 200", code)
+	}
+	var st map[string]any
+	if err := json.Unmarshal([]byte(body), &st); err != nil {
+		t.Fatalf("json unmarshal: %v", err)
+	}
+	if st["hasToken"] != false {
+		t.Errorf("hasToken = %v, want false", st["hasToken"])
+	}
+
+	body, code = get(t, ts.URL+"/api/discord/quests")
+	if code != 200 {
+		t.Fatalf("code=%d, want 200", code)
+	}
+	if strings.TrimSpace(body) != "[]" {
+		t.Errorf("quests = %q, want []", body)
+	}
+}

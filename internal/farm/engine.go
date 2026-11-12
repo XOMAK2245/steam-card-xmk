@@ -130,6 +130,13 @@ func (e *Engine) Logs() []string {
 	return out
 }
 
+// PublishRaw publishes an arbitrary event to all subscribers (used by discord module).
+func (e *Engine) PublishRaw(ev Event) {
+	e.mu.Lock()
+	e.publish(ev)
+	e.mu.Unlock()
+}
+
 func (e *Engine) changed() {
 	s := e.StateJSONReady()
 	e.mu.Lock()
