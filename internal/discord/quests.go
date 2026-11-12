@@ -136,6 +136,12 @@ func (c *Client) doReq(ctx context.Context, method, path string, body any) (*htt
 					wait = time.Duration(secs*1000) * time.Millisecond
 				}
 			}
+			if wait > 60*time.Second {
+				mins := int(wait.Minutes())
+				msg := fmt.Sprintf("Discord rate limit cooldown active: please wait %d min before trying again", mins)
+				c.logf("[Discord] ⚠️ %s", msg)
+				return nil, fmt.Errorf("%s", msg)
+			}
 			c.logf("[Discord] Rate limited, waiting %v", wait)
 			select {
 			case <-ctx.Done():
@@ -217,13 +223,15 @@ func (c *Client) Enroll(ctx context.Context, questID string) error {
 	case <-time.After(jitter):
 	}
 
-	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/enroll", struct{}{})
+	body := map[string]any{"location": 1}
+	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/enroll", body)
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("discord: enroll: HTTP %d", resp.StatusCode)
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("discord: enroll %s: HTTP %d: %s", questID, resp.StatusCode, string(b))
 	}
 	return nil
 }
@@ -235,9 +243,10 @@ func (c *Client) Heartbeat(ctx context.Context, questID string, isStream bool) e
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("discord: heartbeat: HTTP %d", resp.StatusCode)
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("discord: heartbeat %s: HTTP %d: %s", questID, resp.StatusCode, string(b))
 	}
 	return nil
 }
@@ -251,13 +260,15 @@ func (c *Client) Claim(ctx context.Context, questID string) error {
 	case <-time.After(jitter):
 	}
 
-	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/claim", struct{}{})
+	body := map[string]any{"location": 1}
+	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/claim", body)
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("discord: claim: HTTP %d", resp.StatusCode)
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("discord: claim %s: HTTP %d: %s", questID, resp.StatusCode, string(b))
 	}
 	return nil
 }
@@ -277,7 +288,9 @@ func (c *Client) RunQuest(ctx context.Context, quest Quest, onProgress func(elap
 	isStream := quest.IsStream()
 
 	// Enroll if not already enrolled
-	if quest.UserStatus == nil || quest.UserStatus.EnrolledAt == "" {
+	if quest.UserStatus != nil && quest.UserStatus.EnrolledAt != "" {
+		c.logf("[Discord] Quest %s already enrolled, skipping enroll", quest.Name())
+	} else {
 		c.logf("[Discord] Enrolling in quest: %s", quest.Name())
 		if err := c.Enroll(ctx, quest.ID); err != nil {
 			return fmt.Errorf("enroll: %w", err)

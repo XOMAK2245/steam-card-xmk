@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"strings"
@@ -33,9 +34,10 @@ type Server struct {
 	QuitFn func() // safe to call repeatedly; falls back to closing Quit
 
 	// Discord quest support
-	Discord       *discord.Client
-	discordMu     sync.Mutex
-	discordQuests map[string]context.CancelFunc // questID → cancel
+	Discord        *discord.Client
+	discordMu      sync.Mutex
+	discordCancel  context.CancelFunc // cancels active queue runner
+	discordCurrent string             // ID of currently running quest
 }
 
 // InitDiscord creates the Discord client if a token is configured.
@@ -173,14 +175,14 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 
 	// Remove Discord token
 	mux.HandleFunc("POST /api/discord/logout", func(w http.ResponseWriter, r *http.Request) {
-		// Stop any running quests
 		s.discordMu.Lock()
-		for id, cancel := range s.discordQuests {
-			cancel()
-			delete(s.discordQuests, id)
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
 		}
-		s.discordMu.Unlock()
+		s.discordCurrent = ""
 		s.Discord = nil
+		s.discordMu.Unlock()
 		s.Cfg.Update(func(cfg *config.Store) { cfg.Discord.Token = "" })
 		s.Eng.Logf("[Discord] Token removed")
 		s.publishDiscordState()
@@ -201,7 +203,7 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 		writeJSON(w, quests)
 	})
 
-	// Start quest(s)
+	// Start quest(s) - strictly sequential queue execution
 	mux.HandleFunc("POST /api/discord/start", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			QuestID string `json:"questId"`
@@ -230,32 +232,40 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 				toRun = append(toRun, q)
 			}
 		}
+
 		s.discordMu.Lock()
-		if s.discordQuests == nil {
-			s.discordQuests = map[string]context.CancelFunc{}
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
 		}
-		for _, q := range toRun {
-			if _, running := s.discordQuests[q.ID]; running {
-				continue
-			}
-			ctx, cancel := context.WithCancel(context.Background())
-			s.discordQuests[q.ID] = cancel
-			go s.runDiscordQuest(ctx, q)
+		s.discordCurrent = ""
+
+		if len(toRun) == 0 {
+			s.discordMu.Unlock()
+			s.publishDiscordState()
+			writeJSON(w, map[string]bool{"ok": true})
+			return
 		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		s.discordCancel = cancel
 		s.discordMu.Unlock()
-		s.publishDiscordState()
+
+		go s.processDiscordQueue(ctx, toRun)
+
 		writeJSON(w, map[string]bool{"ok": true})
 	})
 
 	// Stop all quests
 	mux.HandleFunc("POST /api/discord/stop", func(w http.ResponseWriter, r *http.Request) {
 		s.discordMu.Lock()
-		for id, cancel := range s.discordQuests {
-			cancel()
-			delete(s.discordQuests, id)
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
 		}
+		s.discordCurrent = ""
 		s.discordMu.Unlock()
-		s.Eng.Logf("[Discord] All quests stopped")
+		s.Eng.Logf("[Discord] Quests stopped")
 		s.publishDiscordState()
 		writeJSON(w, map[string]bool{"ok": true})
 	})
@@ -266,34 +276,69 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 	})
 }
 
-func (s *Server) runDiscordQuest(ctx context.Context, quest discord.Quest) {
+func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest) {
 	defer func() {
 		s.discordMu.Lock()
-		delete(s.discordQuests, quest.ID)
+		s.discordCurrent = ""
+		s.discordCancel = nil
 		s.discordMu.Unlock()
 		s.publishDiscordState()
 	}()
 
-	s.Eng.Logf("[Discord] Starting quest: %s", quest.Name())
-	err := s.Discord.RunQuest(ctx, quest, func(elapsed, total time.Duration) {
+	for i, q := range quests {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		s.discordMu.Lock()
+		s.discordCurrent = q.ID
+		s.discordMu.Unlock()
 		s.publishDiscordState()
-	})
-	if err != nil && !errors.Is(err, context.Canceled) {
-		s.Eng.Logf("[Discord] Quest %s error: %v", quest.Name(), err)
-	} else if err == nil {
-		s.Eng.Logf("[Discord] Quest %s completed!", quest.Name())
+
+		s.Eng.Logf("[Discord] [%d/%d] Starting quest: %s (%s)", i+1, len(quests), q.Name(), q.ID)
+		err := s.Discord.RunQuest(ctx, q, func(elapsed, total time.Duration) {
+			s.publishDiscordState()
+		})
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				s.Eng.Logf("[Discord] Quest %s canceled", q.Name())
+				return
+			}
+			s.Eng.Logf("[Discord] Quest %s error: %v", q.Name(), err)
+			// If rate limited or auth error, abort the entire queue
+			if strings.Contains(strings.ToLower(err.Error()), "rate limit") || errors.Is(err, discord.ErrUnauthorized) {
+				s.Eng.Logf("[Discord] Stopping quest queue due to rate limit/auth error")
+				return
+			}
+		} else {
+			s.Eng.Logf("[Discord] Quest %s completed successfully!", q.Name())
+		}
+
+		// Pause between sequential quests (5-10s) with natural jitter
+		if i < len(quests)-1 {
+			pause := time.Duration(5000+rand.IntN(5000)) * time.Millisecond
+			s.Eng.Logf("[Discord] Waiting %v before next quest...", pause.Round(time.Second))
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(pause):
+			}
+		}
 	}
 }
 
 func (s *Server) getDiscordState() map[string]any {
 	s.discordMu.Lock()
-	running := make([]string, 0, len(s.discordQuests))
-	for id := range s.discordQuests {
-		running = append(running, id)
+	running := []string{}
+	if s.discordCurrent != "" {
+		running = append(running, s.discordCurrent)
 	}
+	hasToken := s.Discord != nil
 	s.discordMu.Unlock()
 	return map[string]any{
-		"hasToken": s.Discord != nil,
+		"hasToken": hasToken,
 		"running":  running,
 	}
 }
