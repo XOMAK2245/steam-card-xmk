@@ -21,3 +21,4 @@ package() {
 
     ln -s /usr/lib/steam-card-xmk/steam-card-xmk "$pkgdir/usr/bin/steam-card-xmk"
 }
+
