@@ -3,12 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Steam Card XMK</title>
+<title>XMK Suite</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <h1>Steam Card XMK</h1>
+  <div class="brand">
+    <h1>XMK Suite</h1>
+    <span class="subtitle" data-i18n="subtitle">Ultimate Gamer Utility</span>
+  </div>
   <div class="pills">
     <span id="pSteam" class="pill">Steam: …</span>
     <span id="pAuth" class="pill">Account: …</span>
@@ -25,6 +28,21 @@
 
 <div id="tabSteam">
   <div id="note" class="note" hidden></div>
+
+  <div class="account-bar card" id="steamAccountBar">
+    <div class="account-current">
+      <img id="steamAvatar" class="avatar" src="" alt="" hidden>
+      <div class="account-info">
+        <span class="account-name" id="steamPersonaName">Not signed in</span>
+        <span class="account-id" id="steamIdDisplay"></span>
+      </div>
+    </div>
+    <div class="account-actions">
+      <select id="steamAccountSelect" class="account-select" hidden></select>
+      <button id="btnSteamAddAccount" class="secondary" data-i18n="addAccount">+ Add Account</button>
+      <button id="btnSteamRemoveAccount" class="ghost danger" data-i18n="removeAccount" hidden>Remove</button>
+    </div>
+  </div>
 
   <section id="loginBox" class="card">
     <h2 data-i18n="loginTitle">Sign in to Steam</h2>
@@ -58,7 +76,6 @@
     <label><span data-i18n="parallel">Max parallel</span> <input id="maxParallel" type="number" min="1" max="32" style="width:4.5em"></label>
     <label><span data-i18n="poll">Check every (min)</span> <input id="pollMin" type="number" min="5" max="120" style="width:4.5em"></label>
     <button id="btnSave" class="secondary" data-i18n="save">Save</button>
-    <button id="btnLogout" class="ghost" data-i18n="logout">Log out</button>
   </section>
 
   <div class="grid">
@@ -84,7 +101,22 @@
     <span data-i18n="dqSafeDesc">Official Discord Desktop client signature, X-Super-Properties, natural timing jitter (27–33s heartbeats) and realistic action delays are enabled. Complete quests without launching heavy games or streaming.</span>
   </div>
 
-  <section class="card">
+  <div class="account-bar card" id="discordAccountBar">
+    <div class="account-current">
+      <img id="discordAvatar" class="avatar" src="" alt="" hidden>
+      <div class="account-info">
+        <span class="account-name" id="discordPersonaName">Not connected</span>
+        <span class="account-id" id="discordIdDisplay"></span>
+      </div>
+    </div>
+    <div class="account-actions">
+      <select id="discordAccountSelect" class="account-select" hidden></select>
+      <button id="btnDiscordAddAccount" class="secondary" data-i18n="dqAddAccount">+ Add Account</button>
+      <button id="btnDiscordRemoveAccount" class="ghost danger" data-i18n="removeAccount" hidden>Remove</button>
+    </div>
+  </div>
+
+  <section class="card" id="dqTokenBox" hidden>
     <h2 data-i18n="dqTokenTitle">Discord Authorization</h2>
     <div class="cols">
       <div>
@@ -92,9 +124,7 @@
         <div style="display:flex; gap:8px; align-items:center;">
           <input id="dqTokenInput" type="password" placeholder="User token (e.g. mfa.xxxx or MT...)" style="flex:1;">
           <button id="dqBtnSaveToken" class="go" data-i18n="dqSaveToken">Save & Connect</button>
-          <button id="dqBtnLogoutToken" class="ghost" data-i18n="dqRemoveToken" hidden>Disconnect</button>
         </div>
-        <div id="dqTokenStatus" class="pill" style="margin-top:10px; display:inline-block;" hidden></div>
       </div>
       <div>
         <p data-i18n="dqHowToTitle">How to get your Discord Token?</p>

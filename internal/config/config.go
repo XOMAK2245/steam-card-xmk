@@ -1,4 +1,4 @@
-// Package config stores user settings and the Steam session on disk.
+// Package config stores user settings and saved accounts on disk.
 package config
 
 import (
@@ -23,6 +23,13 @@ type Session struct {
 	SessionID    string `json:"sessionId"`
 }
 
+type SteamAccount struct {
+	SteamID     string  `json:"steamId"`
+	PersonaName string  `json:"personaName,omitempty"`
+	AvatarURL   string  `json:"avatarUrl,omitempty"`
+	Session     Session `json:"session"`
+}
+
 type Settings struct {
 	Strategy    Strategy `json:"strategy"`
 	MaxParallel int      `json:"maxParallel"` // batch mode: games at once (up to 32)
@@ -34,12 +41,26 @@ type Discord struct {
 	Token string `json:"token,omitempty"`
 }
 
+type DiscordAccount struct {
+	ID         string `json:"id"`
+	Username   string `json:"username"`
+	GlobalName string `json:"globalName,omitempty"`
+	Avatar     string `json:"avatar,omitempty"`
+	AvatarURL  string `json:"avatarUrl,omitempty"`
+	Token      string `json:"token"`
+}
+
 type Store struct {
 	mu       sync.Mutex
 	dir      string
 	Session  Session  `json:"session"`
 	Settings Settings `json:"settings"`
 	Discord  Discord  `json:"discord,omitempty"`
+
+	SteamAccounts   []SteamAccount   `json:"steam_accounts,omitempty"`
+	ActiveSteamID   string           `json:"active_steam_id,omitempty"`
+	DiscordAccounts []DiscordAccount `json:"discord_accounts,omitempty"`
+	ActiveDiscordID string           `json:"active_discord_id,omitempty"`
 }
 
 func Default() Settings {
@@ -59,8 +80,53 @@ func Load() *Store {
 	if b, err := os.ReadFile(filepath.Join(s.dir, "config.json")); err == nil {
 		json.Unmarshal(b, s)
 	}
-	s.Settings.normalize()
+	s.normalize()
 	return s
+}
+
+func (s *Store) normalize() {
+	s.Settings.normalize()
+
+	// 1. Steam migration: if legacy single session exists but accounts list is empty
+	if s.Session.SteamID != "" && len(s.SteamAccounts) == 0 {
+		s.SteamAccounts = append(s.SteamAccounts, SteamAccount{
+			SteamID: s.Session.SteamID,
+			Session: s.Session,
+		})
+		s.ActiveSteamID = s.Session.SteamID
+	}
+	if s.ActiveSteamID == "" && len(s.SteamAccounts) > 0 {
+		s.ActiveSteamID = s.SteamAccounts[0].SteamID
+		s.Session = s.SteamAccounts[0].Session
+	} else if s.ActiveSteamID != "" {
+		for _, a := range s.SteamAccounts {
+			if a.SteamID == s.ActiveSteamID {
+				s.Session = a.Session
+				break
+			}
+		}
+	}
+
+	// 2. Discord migration: if legacy single token exists but accounts list is empty
+	if s.Discord.Token != "" && len(s.DiscordAccounts) == 0 {
+		s.DiscordAccounts = append(s.DiscordAccounts, DiscordAccount{
+			ID:       "default",
+			Username: "Discord User",
+			Token:    s.Discord.Token,
+		})
+		s.ActiveDiscordID = "default"
+	}
+	if s.ActiveDiscordID == "" && len(s.DiscordAccounts) > 0 {
+		s.ActiveDiscordID = s.DiscordAccounts[0].ID
+		s.Discord.Token = s.DiscordAccounts[0].Token
+	} else if s.ActiveDiscordID != "" {
+		for _, a := range s.DiscordAccounts {
+			if a.ID == s.ActiveDiscordID {
+				s.Discord.Token = a.Token
+				break
+			}
+		}
+	}
 }
 
 func (st *Settings) normalize() {
@@ -98,7 +164,7 @@ func (s *Store) Save() error {
 func (s *Store) Update(f func(*Store)) error {
 	s.mu.Lock()
 	f(s)
-	s.Settings.normalize()
+	s.normalize()
 	s.mu.Unlock()
 	return s.Save()
 }
@@ -108,4 +174,124 @@ func (s *Store) Snapshot() (Session, Settings) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.Session, s.Settings
+}
+
+// AddOrUpdateSteamAccount adds or updates an account and optionally makes it active.
+func (s *Store) AddOrUpdateSteamAccount(acc SteamAccount, makeActive bool) {
+	idx := -1
+	for i, a := range s.SteamAccounts {
+		if a.SteamID == acc.SteamID {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		if acc.PersonaName != "" {
+			s.SteamAccounts[idx].PersonaName = acc.PersonaName
+		}
+		if acc.AvatarURL != "" {
+			s.SteamAccounts[idx].AvatarURL = acc.AvatarURL
+		}
+		s.SteamAccounts[idx].Session = acc.Session
+	} else {
+		s.SteamAccounts = append(s.SteamAccounts, acc)
+	}
+	if makeActive || s.ActiveSteamID == "" || s.ActiveSteamID == acc.SteamID {
+		s.ActiveSteamID = acc.SteamID
+		s.Session = acc.Session
+	}
+}
+
+// SwitchSteamAccount switches active Steam account to steamID.
+func (s *Store) SwitchSteamAccount(steamID string) bool {
+	for _, a := range s.SteamAccounts {
+		if a.SteamID == steamID {
+			s.ActiveSteamID = steamID
+			s.Session = a.Session
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveSteamAccount removes an account. If active, switches to next available or clears.
+func (s *Store) RemoveSteamAccount(steamID string) bool {
+	idx := -1
+	for i, a := range s.SteamAccounts {
+		if a.SteamID == steamID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return false
+	}
+	s.SteamAccounts = append(s.SteamAccounts[:idx], s.SteamAccounts[idx+1:]...)
+	if s.ActiveSteamID == steamID {
+		if len(s.SteamAccounts) > 0 {
+			s.ActiveSteamID = s.SteamAccounts[0].SteamID
+			s.Session = s.SteamAccounts[0].Session
+		} else {
+			s.ActiveSteamID = ""
+			s.Session = Session{}
+		}
+	}
+	return true
+}
+
+// AddOrUpdateDiscordAccount adds or updates a Discord account.
+func (s *Store) AddOrUpdateDiscordAccount(acc DiscordAccount, makeActive bool) {
+	idx := -1
+	for i, a := range s.DiscordAccounts {
+		if a.ID == acc.ID || a.Token == acc.Token {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		s.DiscordAccounts[idx] = acc
+	} else {
+		s.DiscordAccounts = append(s.DiscordAccounts, acc)
+	}
+	if makeActive || s.ActiveDiscordID == "" || s.ActiveDiscordID == acc.ID {
+		s.ActiveDiscordID = acc.ID
+		s.Discord.Token = acc.Token
+	}
+}
+
+// SwitchDiscordAccount switches active Discord account to id.
+func (s *Store) SwitchDiscordAccount(id string) bool {
+	for _, a := range s.DiscordAccounts {
+		if a.ID == id {
+			s.ActiveDiscordID = id
+			s.Discord.Token = a.Token
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveDiscordAccount removes a Discord account.
+func (s *Store) RemoveDiscordAccount(id string) bool {
+	idx := -1
+	for i, a := range s.DiscordAccounts {
+		if a.ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return false
+	}
+	s.DiscordAccounts = append(s.DiscordAccounts[:idx], s.DiscordAccounts[idx+1:]...)
+	if s.ActiveDiscordID == id {
+		if len(s.DiscordAccounts) > 0 {
+			s.ActiveDiscordID = s.DiscordAccounts[0].ID
+			s.Discord.Token = s.DiscordAccounts[0].Token
+		} else {
+			s.ActiveDiscordID = ""
+			s.Discord.Token = ""
+		}
+	}
+	return true
 }

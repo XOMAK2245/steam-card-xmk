@@ -42,12 +42,43 @@ type Server struct {
 
 // InitDiscord creates the Discord client if a token is configured.
 func (s *Server) InitDiscord() {
-	sess, _ := s.Cfg.Snapshot()
-	_ = sess
-	// Read discord config directly
 	s.Cfg.Update(func(c *config.Store) {
-		if c.Discord.Token != "" {
-			s.Discord = discord.NewClient(c.Discord.Token, s.Eng.Logf)
+		token := c.Discord.Token
+		if c.ActiveDiscordID != "" {
+			for _, a := range c.DiscordAccounts {
+				if a.ID == c.ActiveDiscordID && a.Token != "" {
+					token = a.Token
+					break
+				}
+			}
+		}
+		if token != "" {
+			s.Discord = discord.NewClient(token, s.Eng.Logf)
+			// Asynchronously refresh user profile in background
+			go func(tok, id string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				client := discord.NewClient(tok, nil)
+				u, err := client.FetchUser(ctx)
+				if err == nil && u != nil {
+					s.Cfg.Update(func(cfg *config.Store) {
+						for i := range cfg.DiscordAccounts {
+							if cfg.DiscordAccounts[i].ID == id || cfg.DiscordAccounts[i].Token == tok {
+								cfg.DiscordAccounts[i].ID = u.ID
+								cfg.DiscordAccounts[i].Username = u.Username
+								cfg.DiscordAccounts[i].GlobalName = u.DisplayName()
+								cfg.DiscordAccounts[i].Avatar = u.Avatar
+								cfg.DiscordAccounts[i].AvatarURL = u.AvatarURL()
+								if cfg.ActiveDiscordID == id || cfg.ActiveDiscordID == "default" {
+									cfg.ActiveDiscordID = u.ID
+								}
+								break
+							}
+						}
+					})
+					s.publishDiscordState()
+				}
+			}(token, c.ActiveDiscordID)
 		}
 	})
 }
@@ -80,8 +111,50 @@ func (s *Server) Handler() http.Handler {
 	})
 	act("logout", func() {
 		s.Eng.Stop()
-		s.Cfg.Update(func(c *config.Store) { c.Session = config.Session{} })
-		s.Eng.Logf("Logged out")
+		s.Cfg.Update(func(c *config.Store) {
+			if c.ActiveSteamID != "" {
+				c.RemoveSteamAccount(c.ActiveSteamID)
+			} else {
+				c.Session = config.Session{}
+			}
+		})
+		s.Eng.Logf("Logged out active Steam account")
+	})
+
+	// Switch active Steam account
+	mux.HandleFunc("POST /api/steam/switch", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			SteamID string `json:"steamId"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.SteamID == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		s.Eng.Stop()
+		s.Cfg.Update(func(c *config.Store) {
+			c.SwitchSteamAccount(in.SteamID)
+		})
+		s.Eng.Logf("Switched to Steam account %s", in.SteamID)
+		s.Eng.FetchOnce()
+		writeJSON(w, s.Eng.State())
+	})
+
+	// Remove a Steam account
+	mux.HandleFunc("POST /api/steam/remove", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			SteamID string `json:"steamId"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.SteamID == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		s.Eng.Stop()
+		s.Cfg.Update(func(c *config.Store) {
+			c.RemoveSteamAccount(in.SteamID)
+		})
+		s.Eng.Logf("Removed Steam account %s", in.SteamID)
+		s.Eng.FetchOnce()
+		writeJSON(w, s.Eng.State())
 	})
 
 	mux.HandleFunc("POST /api/settings", func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +174,12 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /api/login/qr", func(w http.ResponseWriter, r *http.Request) {
 		err := s.QR.Start(func(sess config.Session) {
-			s.Cfg.Update(func(c *config.Store) { c.Session = sess })
+			s.Cfg.Update(func(c *config.Store) {
+				c.AddOrUpdateSteamAccount(config.SteamAccount{
+					SteamID: sess.SteamID,
+					Session: sess,
+				}, true)
+			})
 			s.Eng.Logf("Logged in as Steam ID %s", sess.SteamID)
 			s.Eng.FetchOnce()
 		})
@@ -134,7 +212,12 @@ func (s *Server) Handler() http.Handler {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		s.Cfg.Update(func(c *config.Store) { c.Session = sess })
+		s.Cfg.Update(func(c *config.Store) {
+			c.AddOrUpdateSteamAccount(config.SteamAccount{
+				SteamID: sess.SteamID,
+				Session: sess,
+			}, true)
+		})
 		s.Eng.Logf("Cookies imported for Steam ID %s", sess.SteamID)
 		s.Eng.FetchOnce()
 		writeJSON(w, map[string]bool{"ok": true})
@@ -147,17 +230,18 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
-	// Save / validate Discord token
+	// Save / add Discord account
 	mux.HandleFunc("POST /api/discord/token", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Token string `json:"token"`
 		}
-		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.Token == "" {
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || strings.TrimSpace(in.Token) == "" {
 			http.Error(w, "bad json", 400)
 			return
 		}
-		c := discord.NewClient(in.Token, s.Eng.Logf)
-		_, err := c.FetchQuests(r.Context())
+		token := strings.TrimSpace(in.Token)
+		c := discord.NewClient(token, s.Eng.Logf)
+		u, err := c.FetchUser(r.Context())
 		if err != nil {
 			if errors.Is(err, discord.ErrUnauthorized) {
 				http.Error(w, "Invalid Discord token", 401)
@@ -166,14 +250,111 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 			}
 			return
 		}
-		s.Cfg.Update(func(cfg *config.Store) { cfg.Discord.Token = in.Token })
+
+		acc := config.DiscordAccount{
+			ID:         u.ID,
+			Username:   u.Username,
+			GlobalName: u.DisplayName(),
+			Avatar:     u.Avatar,
+			AvatarURL:  u.AvatarURL(),
+			Token:      token,
+		}
+
+		s.Cfg.Update(func(cfg *config.Store) {
+			cfg.AddOrUpdateDiscordAccount(acc, true)
+		})
+
+		s.discordMu.Lock()
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
+		}
+		s.discordCurrent = ""
 		s.Discord = c
-		s.Eng.Logf("[Discord] Token saved and validated")
+		s.discordMu.Unlock()
+
+		s.Eng.Logf("[Discord] Added account %s (%s)", acc.GlobalName, acc.ID)
+		s.publishDiscordState()
+		writeJSON(w, map[string]any{"ok": true, "account": acc})
+	})
+
+	// Switch active Discord account
+	mux.HandleFunc("POST /api/discord/switch", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			ID string `json:"id"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.ID == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		s.discordMu.Lock()
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
+		}
+		s.discordCurrent = ""
+
+		var newToken string
+		s.Cfg.Update(func(cfg *config.Store) {
+			cfg.SwitchDiscordAccount(in.ID)
+			for _, a := range cfg.DiscordAccounts {
+				if a.ID == cfg.ActiveDiscordID {
+					newToken = a.Token
+					break
+				}
+			}
+		})
+		if newToken != "" {
+			s.Discord = discord.NewClient(newToken, s.Eng.Logf)
+		} else {
+			s.Discord = nil
+		}
+		s.discordMu.Unlock()
+
+		s.Eng.Logf("[Discord] Switched to account %s", in.ID)
 		s.publishDiscordState()
 		writeJSON(w, map[string]bool{"ok": true})
 	})
 
-	// Remove Discord token
+	// Remove a Discord account
+	mux.HandleFunc("POST /api/discord/remove", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			ID string `json:"id"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.ID == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		s.discordMu.Lock()
+		if s.discordCancel != nil {
+			s.discordCancel()
+			s.discordCancel = nil
+		}
+		s.discordCurrent = ""
+
+		var activeToken string
+		s.Cfg.Update(func(cfg *config.Store) {
+			cfg.RemoveDiscordAccount(in.ID)
+			for _, a := range cfg.DiscordAccounts {
+				if a.ID == cfg.ActiveDiscordID {
+					activeToken = a.Token
+					break
+				}
+			}
+		})
+		if activeToken != "" {
+			s.Discord = discord.NewClient(activeToken, s.Eng.Logf)
+		} else {
+			s.Discord = nil
+		}
+		s.discordMu.Unlock()
+
+		s.Eng.Logf("[Discord] Removed account %s", in.ID)
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// Logout / remove active Discord account
 	mux.HandleFunc("POST /api/discord/logout", func(w http.ResponseWriter, r *http.Request) {
 		s.discordMu.Lock()
 		if s.discordCancel != nil {
@@ -183,8 +364,15 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 		s.discordCurrent = ""
 		s.Discord = nil
 		s.discordMu.Unlock()
-		s.Cfg.Update(func(cfg *config.Store) { cfg.Discord.Token = "" })
-		s.Eng.Logf("[Discord] Token removed")
+
+		s.Cfg.Update(func(cfg *config.Store) {
+			if cfg.ActiveDiscordID != "" {
+				cfg.RemoveDiscordAccount(cfg.ActiveDiscordID)
+			} else {
+				cfg.Discord.Token = ""
+			}
+		})
+		s.Eng.Logf("[Discord] Logged out active account")
 		s.publishDiscordState()
 		writeJSON(w, map[string]bool{"ok": true})
 	})
@@ -361,9 +549,30 @@ func (s *Server) getDiscordState() map[string]any {
 	}
 	hasToken := s.Discord != nil
 	s.discordMu.Unlock()
+
+	accounts := []config.DiscordAccount{}
+	activeID := ""
+	s.Cfg.Update(func(cfg *config.Store) {
+		accounts = append(accounts, cfg.DiscordAccounts...)
+		activeID = cfg.ActiveDiscordID
+	})
+
+	safeAccounts := make([]map[string]any, 0, len(accounts))
+	for _, a := range accounts {
+		safeAccounts = append(safeAccounts, map[string]any{
+			"id":         a.ID,
+			"username":   a.Username,
+			"globalName": a.GlobalName,
+			"avatar":     a.Avatar,
+			"avatarUrl":  a.AvatarURL,
+		})
+	}
+
 	return map[string]any{
 		"hasToken": hasToken,
 		"running":  running,
+		"accounts": safeAccounts,
+		"activeId": activeID,
 	}
 }
 

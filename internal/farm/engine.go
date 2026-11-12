@@ -27,18 +27,21 @@ type GameView struct {
 }
 
 type State struct {
-	Status       Status          `json:"status"`
-	SteamRunning bool            `json:"steamRunning"`
-	LoggedIn     bool            `json:"loggedIn"`
-	SteamID      string          `json:"steamId,omitempty"`
-	Strategy     string          `json:"strategy"`
-	Settings     config.Settings `json:"settings"`
-	Games        []GameView      `json:"games"`
-	Active       []uint32        `json:"active"`
-	LastPoll     *time.Time      `json:"lastPoll,omitempty"`
-	NextPoll     *time.Time      `json:"nextPoll,omitempty"`
-	Note         string          `json:"note,omitempty"` // human-readable problem, if any
-	WorkerError  string          `json:"workerError,omitempty"`
+	Status        Status                `json:"status"`
+	SteamRunning  bool                  `json:"steamRunning"`
+	LoggedIn      bool                  `json:"loggedIn"`
+	SteamID       string                `json:"steamId,omitempty"`
+	PersonaName   string                `json:"personaName,omitempty"`
+	AvatarURL     string                `json:"avatarUrl,omitempty"`
+	SteamAccounts []config.SteamAccount `json:"steamAccounts,omitempty"`
+	Strategy      string                `json:"strategy"`
+	Settings      config.Settings       `json:"settings"`
+	Games         []GameView            `json:"games"`
+	Active        []uint32              `json:"active"`
+	LastPoll      *time.Time            `json:"lastPoll,omitempty"`
+	NextPoll      *time.Time            `json:"nextPoll,omitempty"`
+	Note          string                `json:"note,omitempty"` // human-readable problem, if any
+	WorkerError   string                `json:"workerError,omitempty"`
 }
 
 type Event struct {
@@ -161,6 +164,30 @@ func (e *Engine) State() State {
 		SteamID:  sess.SteamID, Strategy: string(set.Strategy), Settings: set,
 		Active: running, Note: e.note,
 	}
+	// Populate Steam accounts list and current profile
+	e.cfg.Update(func(c *config.Store) {
+		st.SteamAccounts = make([]config.SteamAccount, len(c.SteamAccounts))
+		copy(st.SteamAccounts, c.SteamAccounts)
+		// If session SteamID is empty but ActiveSteamID is set, use ActiveSteamID
+		activeSID := sess.SteamID
+		if activeSID == "" {
+			activeSID = c.ActiveSteamID
+		}
+		if activeSID != "" && st.SteamID == "" {
+			st.SteamID = activeSID
+		}
+		for _, a := range c.SteamAccounts {
+			if a.SteamID == activeSID {
+				st.PersonaName = a.PersonaName
+				st.AvatarURL = a.AvatarURL
+				// LoggedIn is true if account exists in accounts list (even without full session for display)
+				if !st.LoggedIn && a.SteamID != "" {
+					st.LoggedIn = a.Session.AccessToken != "" || a.Session.LoginSecure != ""
+				}
+				break
+			}
+		}
+	})
 	if st.Active == nil {
 		st.Active = []uint32{}
 	}
@@ -257,9 +284,35 @@ func (e *Engine) Reconcile() {
 	}
 }
 
+// RefreshProfile fetches persona name and avatar for active Steam ID asynchronously.
+func (e *Engine) RefreshProfile() {
+	sess, _ := e.cfg.Snapshot()
+	if sess.SteamID == "" {
+		return
+	}
+	go func(id string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		name, avatar, err := auth.FetchProfile(ctx, id)
+		if err == nil && name != "" {
+			e.cfg.Update(func(c *config.Store) {
+				for i := range c.SteamAccounts {
+					if c.SteamAccounts[i].SteamID == id {
+						c.SteamAccounts[i].PersonaName = name
+						c.SteamAccounts[i].AvatarURL = avatar
+						break
+					}
+				}
+			})
+			e.changed()
+		}
+	}(sess.SteamID)
+}
+
 // FetchOnce loads the game list without starting to farm.
 func (e *Engine) FetchOnce() {
 	go func() {
+		e.RefreshProfile()
 		e.refresh(context.Background(), false)
 		e.changed()
 	}()

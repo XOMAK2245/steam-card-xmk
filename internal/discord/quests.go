@@ -388,6 +388,48 @@ func (c *Client) Claim(ctx context.Context, questID string) error {
 	return nil
 }
 
+// DiscordUser represents profile information from /users/@me.
+type DiscordUser struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	GlobalName    string `json:"global_name"`
+	Avatar        string `json:"avatar"`
+	Discriminator string `json:"discriminator"`
+}
+
+// DisplayName returns global name if set, otherwise username.
+func (u *DiscordUser) DisplayName() string {
+	if u.GlobalName != "" {
+		return u.GlobalName
+	}
+	return u.Username
+}
+
+// AvatarURL returns the user's avatar image URL.
+func (u *DiscordUser) AvatarURL() string {
+	if u.Avatar != "" {
+		return fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", u.ID, u.Avatar)
+	}
+	return "https://cdn.discordapp.com/embed/avatars/0.png"
+}
+
+// FetchUser fetches the current user's profile from Discord.
+func (c *Client) FetchUser(ctx context.Context) (*DiscordUser, error) {
+	resp, err := c.doReq(ctx, "GET", "users/@me", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("discord: get user: HTTP %d", resp.StatusCode)
+	}
+	var u DiscordUser
+	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 // HeartbeatInterval returns 30 seconds ± random jitter for realistic timing.
 func HeartbeatInterval() time.Duration {
 	return 30*time.Second + time.Duration(rand.IntN(7)-3)*time.Second // 27-33s

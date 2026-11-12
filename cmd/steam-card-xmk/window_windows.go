@@ -12,7 +12,7 @@ import (
 	"github.com/jchv/go-webview2"
 )
 
-const windowTitle = "Steam Card XMK"
+const windowTitle = "XMK Suite"
 
 func init() { runtime.LockOSThread() } // the Win32 message loop must stay on the main thread
 

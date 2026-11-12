@@ -1,11 +1,17 @@
 const $ = id => document.getElementById(id);
 const T = {
-  en:{signin:'Sign in to Steam',saved:'Saved',refreshing:'Refreshing list…',started:'Farming started',paused_:'Paused',stopped_:'Stopped',needLogin:'Sign in to Steam first',cookiesOk:'Cookies imported, loading games…',loggedOut:'Logged out',lost:'Connection to the app lost',quit:'Quit',loginTitle:'Sign in to Steam',qrHelp:'Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.',qrBtn:'Show QR code',ckHelp:'Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).',ckBtn:'Import cookies',start:'Start',pause:'Pause',stop:'Stop',refresh:'Refresh',strategy:'Strategy',batch:'Batch (up to 32 games at once)',single:'Sequential (one game at a time)',parallel:'Max parallel',poll:'Check every (min)',save:'Save',logout:'Log out',games:'Games',name:'Game',left:'Cards left',hours:'Hours',state:'State',log:'Log',
+  en:{
+    subtitle:'Ultimate Gamer Utility',signin:'Sign in to Steam',saved:'Saved',refreshing:'Refreshing list…',started:'Farming started',paused_:'Paused',stopped_:'Stopped',needLogin:'Sign in to Steam first',cookiesOk:'Cookies imported, loading games…',loggedOut:'Logged out',lost:'Connection to the app lost',quit:'Quit',loginTitle:'Sign in to Steam',qrHelp:'Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.',qrBtn:'Show QR code',ckHelp:'Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).',ckBtn:'Import cookies',start:'Start',pause:'Pause',stop:'Stop',refresh:'Refresh',strategy:'Strategy',batch:'Batch (up to 32 games at once)',single:'Sequential (one game at a time)',parallel:'Max parallel',poll:'Check every (min)',save:'Save',logout:'Log out',games:'Games',name:'Game',left:'Cards left',hours:'Hours',state:'State',log:'Log',
     steamOn:'Steam: running',steamOff:'Steam: not running',authOn:'Account: ',authOff:'Not signed in',running:'Farming',paused:'Paused',stopped:'Stopped',queued:'Queued',active:'Farming',done:'Done',failed:'Failed',qrWait:'Waiting for scan…',qrScanned:'Scanned — confirm on your phone…',qrDone:'Signed in',gamesInfo:(n,c)=>`${n} with drops · ${c} cards left`,nextPoll:'next check',
-    tabSteam:'Steam Cards',tabDiscord:'Discord Quests',dqSafeTitle:'Anti-Detection Guard Active:',dqSafeDesc:'Official Discord Desktop client signature, X-Super-Properties, natural timing jitter (27–33s heartbeats), video watch pacing and realistic action delays are enabled. Complete quests without launching heavy games or streaming.',dqTokenTitle:'Discord Authorization',dqTokenHelp:'Enter your Discord User Token. It is stored locally in config.json and used only for official Discord API requests.',dqSaveToken:'Save & Connect',dqRemoveToken:'Disconnect',dqHowToTitle:'How to get your Discord Token?',dqHowToBtn:'Instructions',dqStep1:'Open Discord in your browser (discord.com/app) or desktop app.',dqStep2:'Press Ctrl+Shift+I (or F12) to open Developer Tools.',dqStep3:'Go to the Network tab and filter requests by "api".',dqStep4:'Click any request, find Request Headers, and copy the "authorization" header value.',dqStartAll:'Complete All Quests',dqStop:'Stop Quests',dqRefresh:'Refresh Quests',dqAutoEnroll:'Auto-accept quests before starting',dqQuests:'Active Quests',dqEmpty:'No active quests found or Discord token not configured.',dqConnected:'Discord: connected',dqDisconnected:'Discord: not connected',dqSaved:'Discord token saved',dqRemoved:'Discord token removed',dqStarted:'Quest automation started',dqStopped:'Quest automation stopped',dqRunning:'Running',dqClaimed:'Claimed',dqCompleted:'Completed',dqAvailable:'Available',dqEnrolled:'Enrolled',dqNotEnrolled:'Not enrolled',dqEnrollBtn:'Accept',dqEnrolledSuccess:'Quest accepted',dqStartQuest:'Start',dqReward:'Reward',dqDuration:'Duration',min:'min',sec:'sec'},
-  ru:{signin:'Войти в Steam',saved:'Сохранено',refreshing:'Обновление списка…',started:'Фарм запущен',paused_:'Поставлено на паузу',stopped_:'Остановлено',needLogin:'Сначала войдите в Steam',cookiesOk:'Cookies импортированы, загружаем игры…',loggedOut:'Вы вышли из аккаунта',lost:'Связь с приложением потеряна',quit:'Выход',loginTitle:'Вход в Steam',qrHelp:'Отсканируйте QR-код в мобильном приложении Steam (Steam Guard → «Войти по QR-коду»). Пароль здесь не вводится.',qrBtn:'Показать QR-код',ckHelp:'Запасной вариант: вставьте cookies с steamcommunity.com (браузер → DevTools → Storage → Cookies).',ckBtn:'Импорт cookies',start:'Старт',pause:'Пауза',stop:'Стоп',refresh:'Обновить список',strategy:'Стратегия',batch:'Параллельный (до 32 игр одновременно)',single:'Последовательный (по одной игре)',parallel:'Макс. параллельно',poll:'Проверка каждые (мин)',save:'Сохранить',logout:'Выйти',games:'Игры',name:'Игра',left:'Осталось карт',hours:'Часы',state:'Статус',log:'Лог',
+    addAccount:'+ Add Account',removeAccount:'Remove',switchAccount:'Switch account',confirmRemove:'Are you sure you want to remove this account?',accountSwitched:'Account switched',accountRemoved:'Account removed',steamNotLoggedIn:'Not signed in',discordNotConnected:'Not connected',
+    tabSteam:'Steam Cards',tabDiscord:'Discord Quests',dqSafeTitle:'Anti-Detection Guard Active:',dqSafeDesc:'Official Discord Desktop client signature, X-Super-Properties, natural timing jitter (27–33s heartbeats), video watch pacing and realistic action delays are enabled. Complete quests without launching heavy games or streaming.',dqTokenTitle:'Discord Authorization',dqTokenHelp:'Enter your Discord User Token. It is stored locally in config.json and used only for official Discord API requests.',dqSaveToken:'Save & Connect',dqRemoveToken:'Disconnect',dqHowToTitle:'How to get your Discord Token?',dqHowToBtn:'Instructions',dqStep1:'Open Discord in your browser (discord.com/app) or desktop app.',dqStep2:'Press Ctrl+Shift+I (or F12) to open Developer Tools.',dqStep3:'Go to the Network tab and filter requests by "api".',dqStep4:'Click any request, find Request Headers, and copy the "authorization" header value.',dqStartAll:'Complete All Quests',dqStop:'Stop Quests',dqRefresh:'Refresh Quests',dqAutoEnroll:'Auto-accept quests before starting',dqQuests:'Active Quests',dqEmpty:'No active quests found or Discord token not configured.',dqConnected:'Discord: connected',dqDisconnected:'Discord: not connected',dqSaved:'Discord token saved',dqRemoved:'Discord token removed',dqStarted:'Quest automation started',dqStopped:'Quest automation stopped',dqRunning:'Running',dqClaimed:'Claimed',dqCompleted:'Completed',dqAvailable:'Available',dqEnrolled:'Enrolled',dqNotEnrolled:'Not enrolled',dqEnrollBtn:'Accept',dqEnrolledSuccess:'Quest accepted',dqStartQuest:'Start',dqReward:'Reward',dqDuration:'Duration',min:'min',sec:'sec'
+  },
+  ru:{
+    subtitle:'Ультимативный геймерский комбайн',signin:'Войти в Steam',saved:'Сохранено',refreshing:'Обновление списка…',started:'Фарм запущен',paused_:'Поставлено на паузу',stopped_:'Остановлено',needLogin:'Сначала войдите в Steam',cookiesOk:'Cookies импортированы, загружаем игры…',loggedOut:'Вы вышли из аккаунта',lost:'Связь с приложением потеряна',quit:'Выход',loginTitle:'Вход в Steam',qrHelp:'Отсканируйте QR-код в мобильном приложении Steam (Steam Guard → «Войти по QR-коду»). Пароль здесь не вводится.',qrBtn:'Показать QR-код',ckHelp:'Запасной вариант: вставьте cookies с steamcommunity.com (браузер → DevTools → Storage → Cookies).',ckBtn:'Импорт cookies',start:'Старт',pause:'Пауза',stop:'Стоп',refresh:'Обновить список',strategy:'Стратегия',batch:'Параллельный (до 32 игр одновременно)',single:'Последовательный (по одной игре)',parallel:'Макс. параллельно',poll:'Проверка каждые (мин)',save:'Сохранить',logout:'Выйти',games:'Игры',name:'Игра',left:'Осталось карт',hours:'Часы',state:'Статус',log:'Лог',
     steamOn:'Steam: запущен',steamOff:'Steam: не запущен',authOn:'Аккаунт: ',authOff:'Не авторизован',running:'Фарм идёт',paused:'Пауза',stopped:'Остановлено',queued:'В очереди',active:'Фармится',done:'Готово',failed:'Ошибка',qrWait:'Ждём сканирования…',qrScanned:'Отсканировано — подтвердите на телефоне…',qrDone:'Вход выполнен',gamesInfo:(n,c)=>`${n} с дропом · осталось карт: ${c}`,nextPoll:'след. проверка',
-    tabSteam:'Карточки Steam',tabDiscord:'Квесты Discord',dqSafeTitle:'Защита от детекта активна:',dqSafeDesc:'Используются реальные заголовки официального Desktop клиента Discord, X-Super-Properties, случайный джиттер запросов (27–33 сек), просмотр видео с таймингами и естественные задержки. Квесты выполняются без запуска игр и стримов.',dqTokenTitle:'Авторизация в Discord',dqTokenHelp:'Введите пользовательский токен Discord. Он сохраняется локально в config.json и отправляется только на официальные серверы Discord.',dqSaveToken:'Сохранить и подключиться',dqRemoveToken:'Отключить',dqHowToTitle:'Как получить токен Discord?',dqHowToBtn:'Инструкция',dqStep1:'Откройте Discord в браузере (discord.com/app) или десктопном клиенте.',dqStep2:'Нажмите Ctrl+Shift+I (или F12), чтобы открыть инструменты разработчика.',dqStep3:'Перейдите на вкладку Network (Сеть) и укажите фильтр "api".',dqStep4:'Кликните на любой запрос, найдите Request Headers и скопируйте значение "authorization".',dqStartAll:'Выполнить все квесты',dqStop:'Остановить квесты',dqRefresh:'Обновить квесты',dqAutoEnroll:'Автоматически принимать квесты перед выполнением',dqQuests:'Доступные квесты',dqEmpty:'Активных квестов не найдено или токен Discord ещё не указан.',dqConnected:'Discord: подключён',dqDisconnected:'Discord: не подключён',dqSaved:'Токен Discord сохранён',dqRemoved:'Токен Discord удалён',dqStarted:'Автовыполнение квестов запущено',dqStopped:'Автовыполнение квестов остановлено',dqRunning:'Выполняется',dqClaimed:'Получено',dqCompleted:'Завершён',dqAvailable:'Доступен',dqEnrolled:'Принят',dqNotEnrolled:'Не принят',dqEnrollBtn:'Принять',dqEnrolledSuccess:'Квест успешно принят',dqStartQuest:'Начать',dqReward:'Награда',dqDuration:'Длительность',min:'мин',sec:'сек'}
+    addAccount:'+ Добавить аккаунт',removeAccount:'Удалить',switchAccount:'Сменить аккаунт',confirmRemove:'Вы уверены, что хотите удалить этот аккаунт?',accountSwitched:'Аккаунт переключён',accountRemoved:'Аккаунт удалён',steamNotLoggedIn:'Не авторизован',discordNotConnected:'Не подключён',
+    tabSteam:'Карточки Steam',tabDiscord:'Квесты Discord',dqSafeTitle:'Защита от детекта активна:',dqSafeDesc:'Используются реальные заголовки официального Desktop клиента Discord, X-Super-Properties, случайный джиттер запросов (27–33 сек), просмотр видео с таймингами и естественные задержки. Квесты выполняются без запуска игр и стримов.',dqTokenTitle:'Авторизация в Discord',dqTokenHelp:'Введите пользовательский токен Discord. Он сохраняется локально в config.json и отправляется только на официальные серверы Discord.',dqSaveToken:'Сохранить и подключиться',dqRemoveToken:'Отключить',dqHowToTitle:'Как получить токен Discord?',dqHowToBtn:'Инструкция',dqStep1:'Откройте Discord в браузере (discord.com/app) или десктопном клиенте.',dqStep2:'Нажмите Ctrl+Shift+I (или F12), чтобы открыть инструменты разработчика.',dqStep3:'Перейдите на вкладку Network (Сеть) и укажите фильтр "api".',dqStep4:'Кликните на любой запрос, найдите Request Headers и скопируйте значение "authorization".',dqStartAll:'Выполнить все квесты',dqStop:'Остановить квесты',dqRefresh:'Обновить квесты',dqAutoEnroll:'Автоматически принимать квесты перед выполнением',dqQuests:'Доступные квесты',dqEmpty:'Активных квестов не найдено или токен Discord ещё не указан.',dqConnected:'Discord: подключён',dqDisconnected:'Discord: не подключён',dqSaved:'Токен Discord сохранён',dqRemoved:'Токен Discord удалён',dqStarted:'Автовыполнение квестов запущено',dqStopped:'Автовыполнение квестов остановлено',dqRunning:'Выполняется',dqClaimed:'Получено',dqCompleted:'Завершён',dqAvailable:'Доступен',dqEnrolled:'Принят',dqNotEnrolled:'Не принят',dqEnrollBtn:'Принять',dqEnrolledSuccess:'Квест успешно принят',dqStartQuest:'Начать',dqReward:'Награда',dqDuration:'Длительность',min:'мин',sec:'сек'
+  }
 };
 const L = T[(navigator.language||'en').startsWith('ru')?'ru':'en'];
 document.documentElement.lang = (navigator.language||'en').slice(0,2);
@@ -55,13 +61,46 @@ function render(st) {
   S = st;
   const pill = (el, cls, txt) => { $(el).className = 'pill ' + cls; $(el).textContent = txt; };
   pill('pSteam', st.steamRunning ? 'ok' : 'bad', st.steamRunning ? L.steamOn : L.steamOff);
-  pill('pAuth', st.loggedIn ? 'ok' : 'warn', st.loggedIn ? L.authOn + st.steamId : L.authOff);
+  pill('pAuth', st.loggedIn ? 'ok' : 'warn', st.loggedIn ? (st.personaName || (L.authOn + st.steamId)) : L.authOff);
   pill('pStatus', st.status === 'running' ? 'ok' : '', L[st.status] + (st.status==='running' && st.active.length ? ` · ${st.active.length}` : ''));
   const note = st.workerError ? 'Worker files: ' + st.workerError : st.note;
   $('note').hidden = !note; $('note').textContent = note || '';
-  $('loginBox').hidden = st.loggedIn && !showLogin;
+
   $('btnLoginShow').hidden = st.loggedIn;
-  $('btnLogout').hidden = !st.loggedIn;
+
+  // Steam Account Bar
+  const persona = st.personaName || (st.steamId ? `Steam ID: ${st.steamId}` : '');
+  if (st.loggedIn) {
+    $('steamPersonaName').textContent = persona;
+    $('steamIdDisplay').textContent = st.personaName && st.steamId ? st.steamId : '';
+    if (st.avatarUrl) {
+      $('steamAvatar').src = st.avatarUrl;
+      $('steamAvatar').hidden = false;
+    } else {
+      $('steamAvatar').hidden = true;
+    }
+    $('btnSteamRemoveAccount').hidden = false;
+  } else {
+    $('steamPersonaName').textContent = L.steamNotLoggedIn;
+    $('steamIdDisplay').textContent = '';
+    $('steamAvatar').hidden = true;
+    $('btnSteamRemoveAccount').hidden = true;
+  }
+
+  // Steam accounts select
+  const accs = Array.isArray(st.steamAccounts) ? st.steamAccounts : [];
+  if (accs.length > 1) {
+    $('steamAccountSelect').hidden = false;
+    $('steamAccountSelect').innerHTML = accs.map(a => {
+      const label = a.personaName ? `${a.personaName} (${a.steamId})` : a.steamId;
+      return `<option value="${a.steamId}" ${a.steamId === st.steamId ? 'selected' : ''}>${esc(label)}</option>`;
+    }).join('');
+  } else {
+    $('steamAccountSelect').hidden = true;
+  }
+
+  $('loginBox').hidden = st.loggedIn && !showLogin;
+
   if (!formInit) {
     formInit = true;
     $('strategy').value = st.settings.strategy || 'batch';
@@ -90,6 +129,26 @@ function addLog(line) {
   }
 }
 
+$('btnSteamAddAccount').onclick = () => {
+  showLogin = !showLogin;
+  if (S) render(S);
+};
+$('btnLoginShow').onclick = () => {
+  showLogin = !showLogin;
+  if (S) render(S);
+};
+$('btnSteamRemoveAccount').onclick = async () => {
+  if (confirm(L.confirmRemove)) {
+    await act(() => post('steam/remove', {steamId: S.steamId}), L.accountRemoved);
+  }
+};
+$('steamAccountSelect').onchange = async () => {
+  const sid = $('steamAccountSelect').value;
+  if (sid && S && sid !== S.steamId) {
+    await act(() => post('steam/switch', {steamId: sid}), L.accountSwitched);
+  }
+};
+
 $('btnStart').onclick = () => {
   if (S && !S.loggedIn) { showLogin = true; render(S); return toast(L.needLogin, 'err'); }
   act(() => post('start'), L.started);
@@ -100,8 +159,6 @@ $('btnRefresh').onclick = () => {
   if (S && !S.loggedIn) { showLogin = true; render(S); return toast(L.needLogin, 'err'); }
   act(() => post('refresh'), L.refreshing);
 };
-$('btnLogout').onclick = () => act(() => post('logout'), L.loggedOut);
-$('btnLoginShow').onclick = () => { showLogin = !showLogin; if (S) render(S); };
 $('btnQuit').onclick = async () => {
   try { await post('quit'); } catch (e) {}
   document.body.innerHTML = '<p style="padding:2em">Stopped. You can close this window.</p>';
@@ -110,8 +167,14 @@ $('btnQuit').onclick = async () => {
 $('btnSave').onclick = () => act(() => post('settings', {strategy:$('strategy').value, maxParallel:+$('maxParallel').value, pollMinutes:+$('pollMin').value}).then(render), L.saved);
 $('btnCk').onclick = async () => {
   $('ckErr').textContent = '';
-  try { await post('login/cookies', {LoginSecure:$('ckLogin').value, SessionID:$('ckSess').value}); toast(L.cookiesOk, 'ok'); }
-  catch (e) { $('ckErr').textContent = e.message; toast(e.message, 'err'); }
+  try {
+    await post('login/cookies', {LoginSecure:$('ckLogin').value, SessionID:$('ckSess').value});
+    showLogin = false;
+    toast(L.cookiesOk, 'ok');
+  } catch (e) {
+    $('ckErr').textContent = e.message;
+    toast(e.message, 'err');
+  }
 };
 
 let qrTimer = null;
@@ -124,39 +187,60 @@ $('btnQr').onclick = async () => {
     const q = await api('login/qr');
     if (q.url && q.url !== last) { last = q.url; $('qrImg').src = '/api/login/qr.png?' + Date.now(); }
     $('qrStatus').textContent = q.error || ({waiting:L.qrWait, scanned:L.qrScanned, done:L.qrDone}[q.status] || '');
-    if (q.status === 'done' || q.status === 'error') { clearInterval(qrTimer); if (q.status==='done') $('qrWrap').hidden = true; }
+    if (q.status === 'done' || q.status === 'error') {
+      clearInterval(qrTimer);
+      if (q.status==='done') {
+        showLogin = false;
+        $('qrWrap').hidden = true;
+      }
+    }
   }, 1500);
 };
 
 // ---- Discord Quests Module ----
-let DQ = { hasToken: false, running: [], quests: [] };
+let DQ = { hasToken: false, running: [], quests: [], accounts: [], activeId: '' };
+let showDiscordAdd = false;
 
 async function loadDiscordState() {
   try {
     const st = await api('discord/state');
     DQ.hasToken = !!st.hasToken;
     DQ.running = Array.isArray(st.running) ? st.running : [];
+    DQ.accounts = Array.isArray(st.accounts) ? st.accounts : [];
+    DQ.activeId = st.activeId || '';
     updateDiscordHeader();
   } catch (e) {}
 }
 
 function updateDiscordHeader() {
-  const statusEl = $('dqTokenStatus');
-  const logoutBtn = $('dqBtnLogoutToken');
-  const tokenInput = $('dqTokenInput');
-  if (DQ.hasToken) {
-    statusEl.hidden = false;
-    statusEl.className = 'pill ok';
-    statusEl.textContent = L.dqConnected;
-    logoutBtn.hidden = false;
-    tokenInput.placeholder = '••••••••••••••••';
+  const accs = DQ.accounts;
+  const active = accs.find(a => a.id === DQ.activeId) || accs[0];
+
+  if (DQ.hasToken && active) {
+    const displayName = active.globalName || active.username || ('User #' + active.id);
+    $('discordPersonaName').textContent = displayName;
+    $('discordIdDisplay').textContent = active.username && active.username !== displayName ? `@${active.username} · ${active.id}` : active.id;
+    $('discordAvatar').src = active.avatarUrl || 'https://cdn.discordapp.com/embed/avatars/0.png';
+    $('discordAvatar').hidden = false;
+    $('btnDiscordRemoveAccount').hidden = false;
   } else {
-    statusEl.hidden = false;
-    statusEl.className = 'pill warn';
-    statusEl.textContent = L.dqDisconnected;
-    logoutBtn.hidden = true;
-    tokenInput.placeholder = 'User token (e.g. mfa.xxxx or MT...)';
+    $('discordPersonaName').textContent = L.discordNotConnected;
+    $('discordIdDisplay').textContent = '';
+    $('discordAvatar').hidden = true;
+    $('btnDiscordRemoveAccount').hidden = true;
   }
+
+  if (accs.length > 1) {
+    $('discordAccountSelect').hidden = false;
+    $('discordAccountSelect').innerHTML = accs.map(a => {
+      const label = a.globalName || a.username || a.id;
+      return `<option value="${a.id}" ${a.id === DQ.activeId ? 'selected' : ''}>${esc(label)}</option>`;
+    }).join('');
+  } else {
+    $('discordAccountSelect').hidden = true;
+  }
+
+  $('dqTokenBox').hidden = DQ.hasToken && !showDiscordAdd;
 }
 
 async function loadDiscordQuests() {
@@ -282,23 +366,38 @@ window.stopDiscordQuest = async (id) => {
   await loadDiscordState();
 };
 
+$('btnDiscordAddAccount').onclick = () => {
+  showDiscordAdd = !showDiscordAdd;
+  updateDiscordHeader();
+};
+
+$('btnDiscordRemoveAccount').onclick = async () => {
+  if (confirm(L.confirmRemove)) {
+    await act(() => post('discord/remove', {id: DQ.activeId}), L.accountRemoved);
+    await loadDiscordState();
+    await loadDiscordQuests();
+  }
+};
+
+$('discordAccountSelect').onchange = async () => {
+  const newId = $('discordAccountSelect').value;
+  if (newId && newId !== DQ.activeId) {
+    await act(() => post('discord/switch', {id: newId}), L.accountSwitched);
+    await loadDiscordState();
+    await loadDiscordQuests();
+  }
+};
+
 $('dqBtnSaveToken').onclick = async () => {
   const token = $('dqTokenInput').value.trim();
   if (!token) return toast('Please enter a Discord token', 'err');
   await act(async () => {
     await post('discord/token', {token});
+    showDiscordAdd = false;
     $('dqTokenInput').value = '';
     await loadDiscordState();
     await loadDiscordQuests();
   }, L.dqSaved);
-};
-
-$('dqBtnLogoutToken').onclick = async () => {
-  await act(async () => {
-    await post('discord/logout');
-    await loadDiscordState();
-    await loadDiscordQuests();
-  }, L.dqRemoved);
 };
 
 $('dqBtnHowTo').onclick = () => {
@@ -347,6 +446,8 @@ try {
       const st = JSON.parse(e.data);
       DQ.hasToken = !!st.hasToken;
       DQ.running = Array.isArray(st.running) ? st.running : [];
+      DQ.accounts = Array.isArray(st.accounts) ? st.accounts : [];
+      DQ.activeId = st.activeId || '';
       updateDiscordHeader();
       loadDiscordQuests();
     } catch (x) {}

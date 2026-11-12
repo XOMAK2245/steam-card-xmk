@@ -1,8 +1,8 @@
 # Maintainer: XOMAK2245
 pkgname=steam-card-xmk-bin
-pkgver=0.5.3
+pkgver=0.6.0
 pkgrel=1
-pkgdesc="Cross-platform automated Steam trading card phantom farmer"
+pkgdesc="XMK Suite – ultimate gamer utility: Steam card farmer + Discord quest automation"
 arch=('x86_64')
 url="https://github.com/XOMAK2245/steam-card-xmk"
 license=('MIT')
