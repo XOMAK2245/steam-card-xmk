@@ -11,13 +11,12 @@ import (
 
 // Plan decides which AppIDs should be running right now.
 //
-//   - sequential: the single best game (most playtime first, since it drops soonest).
-//   - smart: while there are games below the playtime threshold, run up to
-//     maxParallel of them together; otherwise fall back to one game at a time.
+//   - batch: run up to maxParallel games with remaining card drops simultaneously.
+//   - single: run 1 game at a time (most playtime first, then fewest cards remaining).
 //
 // hours maps AppID to the *effective* playtime (Steam's value plus time we have
 // been running since). skip contains AppIDs excluded (failed to start).
-func Plan(games []badges.Game, hours map[uint32]float64, skip map[uint32]bool, strat config.Strategy, maxParallel int, thr float64) []uint32 {
+func Plan(games []badges.Game, hours map[uint32]float64, skip map[uint32]bool, strat config.Strategy, maxParallel int) []uint32 {
 	var q []badges.Game
 	for _, g := range games {
 		if g.Remaining > 0 && !skip[g.AppID] {
@@ -30,23 +29,28 @@ func Plan(games []badges.Game, hours map[uint32]float64, skip map[uint32]bool, s
 		}
 		return g.Hours
 	}
-	sort.SliceStable(q, func(i, j int) bool { return h(q[i]) > h(q[j]) })
+	sort.SliceStable(q, func(i, j int) bool {
+		hi, hj := h(q[i]), h(q[j])
+		if hi != hj {
+			return hi > hj
+		}
+		return q[i].Remaining < q[j].Remaining
+	})
 	if len(q) == 0 {
 		return nil
 	}
-	if strat == config.Smart {
-		var fresh []uint32
-		for _, g := range q {
-			if h(g) < thr {
-				fresh = append(fresh, g.AppID)
-			}
-		}
-		if len(fresh) > maxParallel {
-			fresh = fresh[:maxParallel]
-		}
-		if len(fresh) > 0 {
-			return fresh
-		}
+	if strat == config.Single {
+		return []uint32{q[0].AppID}
 	}
-	return []uint32{q[0].AppID}
+	if maxParallel < 1 {
+		maxParallel = 32
+	}
+	if len(q) > maxParallel {
+		q = q[:maxParallel]
+	}
+	out := make([]uint32, len(q))
+	for i, g := range q {
+		out[i] = g.AppID
+	}
+	return out
 }

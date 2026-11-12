@@ -1,9 +1,9 @@
 const $ = id => document.getElementById(id);
 const T = {
-  en:{signin:'Sign in to Steam',saved:'Saved',refreshing:'Refreshing list…',started:'Farming started',paused_:'Paused',stopped_:'Stopped',needLogin:'Sign in to Steam first',cookiesOk:'Cookies imported, loading games…',loggedOut:'Logged out',lost:'Connection to the app lost',quit:'Quit',loginTitle:'Sign in to Steam',qrHelp:'Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.',qrBtn:'Show QR code',ckHelp:'Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).',ckBtn:'Import cookies',start:'▶ Start',pause:'⏸ Pause',stop:'⏹ Stop',refresh:'⟳ Refresh list',strategy:'Strategy',smart:'Smart (parallel, then one by one)',sequential:'Sequential (one game at a time)',parallel:'Max parallel',thr:'Parallel until (h)',poll:'Check every (min)',save:'Save',logout:'Log out',games:'Games',name:'Game',left:'Cards left',hours:'Hours',state:'State',log:'Log',
-    steamOn:'Steam: running',steamOff:'Steam: not running',authOn:'Account: ',authOff:'Not signed in',running:'Farming',paused:'Paused',stopped:'Stopped',queued:'queued',active:'farming',done:'done',failed:'failed',qrWait:'Waiting for scan…',qrScanned:'Scanned — confirm on your phone…',qrDone:'Signed in ✓',gamesInfo:(n,c)=>`${n} with drops · ${c} cards left`,nextPoll:'next check'},
-  ru:{signin:'Войти в Steam',saved:'Сохранено',refreshing:'Обновление списка…',started:'Фарм запущен',paused_:'Поставлено на паузу',stopped_:'Остановлено',needLogin:'Сначала войдите в Steam',cookiesOk:'Cookies импортированы, загружаем игры…',loggedOut:'Вы вышли из аккаунта',lost:'Связь с приложением потеряна',quit:'Выход',loginTitle:'Вход в Steam',qrHelp:'Отсканируйте QR-код в мобильном приложении Steam (Steam Guard → «Войти по QR-коду»). Пароль здесь не вводится.',qrBtn:'Показать QR-код',ckHelp:'Запасной вариант: вставьте cookies с steamcommunity.com (браузер → DevTools → Storage → Cookies).',ckBtn:'Импорт cookies',start:'▶ Старт',pause:'⏸ Пауза',stop:'⏹ Стоп',refresh:'⟳ Обновить список',strategy:'Стратегия',smart:'Умная (параллельно, затем по одной)',sequential:'Последовательная (по одной игре)',parallel:'Макс. параллельно',thr:'Параллельно до (ч)',poll:'Проверка каждые (мин)',save:'Сохранить',logout:'Выйти',games:'Игры',name:'Игра',left:'Осталось карт',hours:'Часы',state:'Статус',log:'Лог',
-    steamOn:'Steam: запущен',steamOff:'Steam: не запущен',authOn:'Аккаунт: ',authOff:'Не авторизован',running:'Фарм идёт',paused:'Пауза',stopped:'Остановлено',queued:'в очереди',active:'фармится',done:'готово',failed:'ошибка',qrWait:'Ждём сканирования…',qrScanned:'Отсканировано — подтвердите на телефоне…',qrDone:'Вход выполнен ✓',gamesInfo:(n,c)=>`${n} с дропом · осталось карт: ${c}`,nextPoll:'след. проверка'}
+  en:{signin:'Sign in to Steam',saved:'Saved',refreshing:'Refreshing list…',started:'Farming started',paused_:'Paused',stopped_:'Stopped',needLogin:'Sign in to Steam first',cookiesOk:'Cookies imported, loading games…',loggedOut:'Logged out',lost:'Connection to the app lost',quit:'Quit',loginTitle:'Sign in to Steam',qrHelp:'Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.',qrBtn:'Show QR code',ckHelp:'Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).',ckBtn:'Import cookies',start:'Start',pause:'Pause',stop:'Stop',refresh:'Refresh',strategy:'Strategy',batch:'Batch (up to 32 games at once)',single:'Sequential (one game at a time)',parallel:'Max parallel',poll:'Check every (min)',save:'Save',logout:'Log out',games:'Games',name:'Game',left:'Cards left',hours:'Hours',state:'State',log:'Log',
+    steamOn:'Steam: running',steamOff:'Steam: not running',authOn:'Account: ',authOff:'Not signed in',running:'Farming',paused:'Paused',stopped:'Stopped',queued:'Queued',active:'Farming',done:'Done',failed:'Failed',qrWait:'Waiting for scan…',qrScanned:'Scanned — confirm on your phone…',qrDone:'Signed in',gamesInfo:(n,c)=>`${n} with drops · ${c} cards left`,nextPoll:'next check'},
+  ru:{signin:'Войти в Steam',saved:'Сохранено',refreshing:'Обновление списка…',started:'Фарм запущен',paused_:'Поставлено на паузу',stopped_:'Остановлено',needLogin:'Сначала войдите в Steam',cookiesOk:'Cookies импортированы, загружаем игры…',loggedOut:'Вы вышли из аккаунта',lost:'Связь с приложением потеряна',quit:'Выход',loginTitle:'Вход в Steam',qrHelp:'Отсканируйте QR-код в мобильном приложении Steam (Steam Guard → «Войти по QR-коду»). Пароль здесь не вводится.',qrBtn:'Показать QR-код',ckHelp:'Запасной вариант: вставьте cookies с steamcommunity.com (браузер → DevTools → Storage → Cookies).',ckBtn:'Импорт cookies',start:'Старт',pause:'Пауза',stop:'Стоп',refresh:'Обновить список',strategy:'Стратегия',batch:'Параллельный (до 32 игр одновременно)',single:'Последовательный (по одной игре)',parallel:'Макс. параллельно',poll:'Проверка каждые (мин)',save:'Сохранить',logout:'Выйти',games:'Игры',name:'Игра',left:'Осталось карт',hours:'Часы',state:'Статус',log:'Лог',
+    steamOn:'Steam: запущен',steamOff:'Steam: не запущен',authOn:'Аккаунт: ',authOff:'Не авторизован',running:'Фарм идёт',paused:'Пауза',stopped:'Остановлено',queued:'В очереди',active:'Фармится',done:'Готово',failed:'Ошибка',qrWait:'Ждём сканирования…',qrScanned:'Отсканировано — подтвердите на телефоне…',qrDone:'Вход выполнен',gamesInfo:(n,c)=>`${n} с дропом · осталось карт: ${c}`,nextPoll:'след. проверка'}
 };
 const L = T[(navigator.language||'en').startsWith('ru')?'ru':'en'];
 document.documentElement.lang = (navigator.language||'en').slice(0,2);
@@ -22,7 +22,6 @@ async function api(path, body) {
   return r.json();
 }
 const post = (p, b = {}) => api(p, b);
-// Run an action, showing a success toast or the error.
 async function act(fn, okMsg) {
   try { const r = await fn(); if (okMsg) toast(okMsg, 'ok'); return r; }
   catch (e) { toast(e.message, 'err'); }
@@ -44,8 +43,9 @@ function render(st) {
   $('btnLogout').hidden = !st.loggedIn;
   if (!formInit) {
     formInit = true;
-    $('strategy').value = st.settings.strategy; $('maxParallel').value = st.settings.maxParallel;
-    $('parHours').value = st.settings.parallelHours; $('pollMin').value = st.settings.pollMinutes;
+    $('strategy').value = st.settings.strategy || 'batch';
+    $('maxParallel').value = st.settings.maxParallel || 32;
+    $('pollMin').value = st.settings.pollMinutes || 5;
   }
   const rank = {active:0, queued:1, failed:2, done:3};
   const games = [...st.games].sort((a,b) => rank[a.state]-rank[b.state] || b.hours-a.hours);
@@ -61,7 +61,6 @@ function addLog(line) {
   el.textContent += line + '\n';
   if (atEnd) el.scrollTop = el.scrollHeight;
 }
-
 
 $('btnStart').onclick = () => {
   if (S && !S.loggedIn) { showLogin = true; render(S); return toast(L.needLogin, 'err'); }
@@ -80,7 +79,7 @@ $('btnQuit').onclick = async () => {
   document.body.innerHTML = '<p style="padding:2em">Stopped. You can close this window.</p>';
   window.close();
 };
-$('btnSave').onclick = () => act(() => post('settings', {strategy:$('strategy').value, maxParallel:+$('maxParallel').value, parallelHours:+$('parHours').value, pollMinutes:+$('pollMin').value}).then(render), L.saved);
+$('btnSave').onclick = () => act(() => post('settings', {strategy:$('strategy').value, maxParallel:+$('maxParallel').value, pollMinutes:+$('pollMin').value}).then(render), L.saved);
 $('btnCk').onclick = async () => {
   $('ckErr').textContent = '';
   try { await post('login/cookies', {LoginSecure:$('ckLogin').value, SessionID:$('ckSess').value}); toast(L.cookiesOk, 'ok'); }
@@ -100,7 +99,6 @@ $('btnQr').onclick = async () => {
     if (q.status === 'done' || q.status === 'error') { clearInterval(qrTimer); if (q.status==='done') $('qrWrap').hidden = true; }
   }, 1500);
 };
-
 
 // Each startup request is independent: one failing must never break the UI.
 api('state').then(render).catch(e => toast(e.message, 'err'));

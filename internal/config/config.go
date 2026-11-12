@@ -11,8 +11,8 @@ import (
 type Strategy string
 
 const (
-	Sequential Strategy = "sequential"
-	Smart      Strategy = "smart"
+	Batch  Strategy = "batch"
+	Single Strategy = "single"
 )
 
 type Session struct {
@@ -24,11 +24,10 @@ type Session struct {
 }
 
 type Settings struct {
-	Strategy      Strategy `json:"strategy"`
-	MaxParallel   int      `json:"maxParallel"`   // smart mode: games at once
-	ParallelHours float64  `json:"parallelHours"` // smart mode: threshold of playtime
-	PollMinutes   int      `json:"pollMinutes"`   // badge page refresh interval
-	WorkerDir     string   `json:"workerDir,omitempty"`
+	Strategy    Strategy `json:"strategy"`
+	MaxParallel int      `json:"maxParallel"` // batch mode: games at once (up to 32)
+	PollMinutes int      `json:"pollMinutes"` // badge page refresh interval
+	WorkerDir   string   `json:"workerDir,omitempty"`
 }
 
 type Store struct {
@@ -39,7 +38,7 @@ type Store struct {
 }
 
 func Default() Settings {
-	return Settings{Strategy: Smart, MaxParallel: 30, ParallelHours: 2, PollMinutes: 7}
+	return Settings{Strategy: Batch, MaxParallel: 32, PollMinutes: 5}
 }
 
 func Dir() string {
@@ -61,14 +60,16 @@ func Load() *Store {
 
 func (st *Settings) normalize() {
 	d := Default()
-	if st.Strategy != Sequential && st.Strategy != Smart {
+	switch st.Strategy {
+	case "sequential", Single:
+		st.Strategy = Single
+	case "smart", Batch:
+		st.Strategy = Batch
+	default:
 		st.Strategy = d.Strategy
 	}
 	if st.MaxParallel < 1 || st.MaxParallel > 32 {
 		st.MaxParallel = d.MaxParallel
-	}
-	if st.ParallelHours <= 0 {
-		st.ParallelHours = d.ParallelHours
 	}
 	if st.PollMinutes < 5 {
 		st.PollMinutes = 5 // protect against Steam rate limits

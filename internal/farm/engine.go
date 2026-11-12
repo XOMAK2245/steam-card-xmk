@@ -238,6 +238,18 @@ func (e *Engine) RefreshNow() {
 	e.mu.Unlock()
 }
 
+// Reconcile triggers an immediate plan check if the engine is currently running.
+func (e *Engine) Reconcile() {
+	e.mu.Lock()
+	running := e.status == Running
+	e.mu.Unlock()
+	if running {
+		go e.tick(context.Background())
+	} else {
+		e.changed()
+	}
+}
+
 // FetchOnce loads the game list without starting to farm.
 func (e *Engine) FetchOnce() {
 	go func() {
@@ -322,7 +334,7 @@ func (e *Engine) tick(ctx context.Context) {
 	}
 	e.mu.Unlock()
 
-	target := Plan(games, hours, skip, set.Strategy, set.MaxParallel, set.ParallelHours)
+	target := Plan(games, hours, skip, set.Strategy, set.MaxParallel)
 	want := map[uint32]bool{}
 	for _, id := range target {
 		want[id] = true

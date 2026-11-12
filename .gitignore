@@ -1,3 +1,7 @@
 dist/
 *.tmp
 internal/embedded/bin/linux/steam_phantom
+packaging/arch/pkg/
+packaging/arch/src/
+packaging/arch/*.zst
+packaging/arch/*.tar.gz

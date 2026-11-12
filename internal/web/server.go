@@ -69,9 +69,10 @@ func (s *Server) Handler() http.Handler {
 		}
 		s.Cfg.Update(func(c *config.Store) {
 			c.Settings.Strategy, c.Settings.MaxParallel = in.Strategy, in.MaxParallel
-			c.Settings.ParallelHours, c.Settings.PollMinutes = in.ParallelHours, in.PollMinutes
+			c.Settings.PollMinutes = in.PollMinutes
 		})
-		s.Eng.Logf("Settings saved (strategy: %s)", in.Strategy)
+		s.Eng.Logf("Settings saved (strategy: %s, max parallel: %d)", in.Strategy, in.MaxParallel)
+		s.Eng.Reconcile()
 		writeJSON(w, s.Eng.State())
 	})
 
