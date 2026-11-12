@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libdl-dev zip
+
+      - name: Build Linux binaries
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p build/linux/steam-card-xmk-linux-x86_64
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o build/linux/steam-card-xmk-linux-x86_64/steam-card-xmk ./cmd/steam-card-xmk
+          gcc -O2 -Wall -o build/linux/steam-card-xmk-linux-x86_64/steam_phantom worker/steam_phantom.c -ldl
+          cp third_party/steamworks/libsteam_api.so build/linux/steam-card-xmk-linux-x86_64/
+          
+          cd build/linux
+          tar -czvf ../../steam-card-xmk-linux-x86_64.tar.gz steam-card-xmk-linux-x86_64
+          cd ../..
+
+      - name: Build Windows binaries
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p build/windows/steam-card-xmk-windows-x86_64
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o build/windows/steam-card-xmk-windows-x86_64/steam-card-xmk.exe ./cmd/steam-card-xmk
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION} -H windowsgui" -o build/windows/steam-card-xmk-windows-x86_64/phantom.exe ./cmd/phantom-win
+          cp third_party/steamworks/steam_api64.dll build/windows/steam-card-xmk-windows-x86_64/
+          
+          cd build/windows
+          zip -r ../../steam-card-xmk-windows-x86_64.zip steam-card-xmk-windows-x86_64
+          cd ../..
+
+      - name: Prepare Arch PKGBUILD
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" packaging/arch/PKGBUILD
+          cp packaging/arch/PKGBUILD ./PKGBUILD
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            steam-card-xmk-linux-x86_64.tar.gz
+            steam-card-xmk-windows-x86_64.zip
+            PKGBUILD
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Steam Card XMK</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🃏 Steam Card XMK</h1>
+  <div class="pills">
+    <span id="pSteam" class="pill">Steam: …</span>
+    <span id="pAuth" class="pill">Account: …</span>
+    <span id="pStatus" class="pill">…</span>
+  </div>
+  <button id="btnQuit" class="ghost" data-i18n="quit">Quit</button>
+</header>
+
+<div id="note" class="note" hidden></div>
+
+<section id="loginBox" class="card" hidden>
+  <h2 data-i18n="loginTitle">Sign in to Steam</h2>
+  <div class="cols">
+    <div>
+      <p data-i18n="qrHelp">Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.</p>
+      <button id="btnQr" data-i18n="qrBtn">Show QR code</button>
+      <div id="qrWrap" hidden><img id="qrImg" alt="QR" width="240" height="240"><div id="qrStatus"></div></div>
+    </div>
+    <div>
+      <p data-i18n="ckHelp">Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).</p>
+      <input id="ckLogin" placeholder="steamLoginSecure">
+      <input id="ckSess" placeholder="sessionid">
+      <button id="btnCk" class="secondary" data-i18n="ckBtn">Import cookies</button>
+      <div id="ckErr" class="err"></div>
+    </div>
+  </div>
+</section>
+
+<section class="card controls">
+  <button id="btnStart" class="go" data-i18n="start">▶ Start</button>
+  <button id="btnPause" data-i18n="pause">⏸ Pause</button>
+  <button id="btnStop" class="stop" data-i18n="stop">⏹ Stop</button>
+  <button id="btnRefresh" class="secondary" data-i18n="refresh">⟳ Refresh list</button>
+  <span class="spacer"></span>
+  <label><span data-i18n="strategy">Strategy</span>
+    <select id="strategy">
+      <option value="smart" data-i18n="smart">Smart (parallel, then one by one)</option>
+      <option value="sequential" data-i18n="sequential">Sequential (one game at a time)</option>
+    </select></label>
+  <label><span data-i18n="parallel">Max parallel</span> <input id="maxParallel" type="number" min="1" max="32" style="width:4.5em"></label>
+  <label><span data-i18n="thr">Parallel until (h)</span> <input id="parHours" type="number" step="0.5" min="0.5" style="width:4.5em"></label>
+  <label><span data-i18n="poll">Check every (min)</span> <input id="pollMin" type="number" min="5" max="120" style="width:4.5em"></label>
+  <button id="btnSave" class="secondary" data-i18n="save">Save</button>
+  <button id="btnLogout" class="ghost" data-i18n="logout">Log out</button>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2><span data-i18n="games">Games</span> <small id="gamesInfo"></small></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>AppID</th><th data-i18n="name">Game</th><th data-i18n="left">Cards left</th><th data-i18n="hours">Hours</th><th data-i18n="state">State</th></tr></thead>
+      <tbody id="games"></tbody>
+    </table>
+    </div>
+  </section>
+  <section class="card">
+    <h2 data-i18n="log">Log</h2>
+    <pre id="log"></pre>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

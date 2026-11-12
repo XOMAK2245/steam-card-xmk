@@ -1,0 +1,23 @@
+# Maintainer: XOMAK2245
+pkgname=steam-card-xmk-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Cross-platform automated Steam trading card phantom farmer"
+arch=('x86_64')
+url="https://github.com/XOMAK2245/steam-card-xmk"
+license=('MIT')
+depends=('glibc')
+optdepends=('steam: local Steam client needed for farming')
+source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/steam-card-xmk-linux-x86_64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    install -d "$pkgdir/usr/lib/steam-card-xmk"
+    install -d "$pkgdir/usr/bin"
+
+    cp -a "$srcdir/steam-card-xmk-linux-x86_64/"* "$pkgdir/usr/lib/steam-card-xmk/"
+    chmod 755 "$pkgdir/usr/lib/steam-card-xmk/steam-card-xmk"
+    chmod 755 "$pkgdir/usr/lib/steam-card-xmk/steam_phantom"
+
+    ln -s /usr/lib/steam-card-xmk/steam-card-xmk "$pkgdir/usr/bin/steam-card-xmk"
+}
