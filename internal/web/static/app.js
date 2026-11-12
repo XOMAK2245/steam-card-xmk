@@ -4,13 +4,13 @@ const T = {
     subtitle:'Ultimate Gamer Utility',signin:'Sign in to Steam',saved:'Saved',refreshing:'Refreshing list…',started:'Farming started',paused_:'Paused',stopped_:'Stopped',needLogin:'Sign in to Steam first',cookiesOk:'Cookies imported, loading games…',loggedOut:'Logged out',lost:'Connection to the app lost',quit:'Quit',loginTitle:'Sign in to Steam',qrHelp:'Scan the QR code with the Steam mobile app (Steam Guard → “Sign in with QR code”). No password is entered here.',qrBtn:'Show QR code',ckHelp:'Fallback: paste cookies from steamcommunity.com (browser → DevTools → Storage → Cookies).',ckBtn:'Import cookies',start:'Start',pause:'Pause',stop:'Stop',refresh:'Refresh',strategy:'Strategy',batch:'Batch (up to 32 games at once)',single:'Sequential (one game at a time)',parallel:'Max parallel',poll:'Check every (min)',save:'Save',logout:'Log out',games:'Games',name:'Game',left:'Cards left',hours:'Hours',state:'State',log:'Log',
     steamOn:'Steam: running',steamOff:'Steam: not running',authOn:'Account: ',authOff:'Not signed in',running:'Farming',paused:'Paused',stopped:'Stopped',queued:'Queued',active:'Farming',done:'Done',failed:'Failed',qrWait:'Waiting for scan…',qrScanned:'Scanned — confirm on your phone…',qrDone:'Signed in',gamesInfo:(n,c)=>`${n} with drops · ${c} cards left`,nextPoll:'next check',
     addAccount:'+ Add Account',removeAccount:'Remove',switchAccount:'Switch account',confirmRemove:'Are you sure you want to remove this account?',accountSwitched:'Account switched',accountRemoved:'Account removed',steamNotLoggedIn:'Not signed in',discordNotConnected:'Not connected',
-    tabSteam:'Steam Cards',tabDiscord:'Discord Quests',dqSafeTitle:'Anti-Detection Guard Active:',dqSafeDesc:'Official Discord Desktop client signature, X-Super-Properties, natural timing jitter (27–33s heartbeats), video watch pacing and realistic action delays are enabled. Complete quests without launching heavy games or streaming.',dqTokenTitle:'Discord Authorization',dqTokenHelp:'Enter your Discord User Token. It is stored locally in config.json and used only for official Discord API requests.',dqSaveToken:'Save & Connect',dqRemoveToken:'Disconnect',dqHowToTitle:'How to get your Discord Token?',dqHowToBtn:'Instructions',dqStep1:'Open Discord in your browser (discord.com/app) or desktop app.',dqStep2:'Press Ctrl+Shift+I (or F12) to open Developer Tools.',dqStep3:'Go to the Network tab and filter requests by "api".',dqStep4:'Click any request, find Request Headers, and copy the "authorization" header value.',dqStartAll:'Complete All Quests',dqStop:'Stop Quests',dqRefresh:'Refresh Quests',dqAutoEnroll:'Auto-accept quests before starting',dqQuests:'Active Quests',dqEmpty:'No active quests found or Discord token not configured.',dqNoResults:'No quests match the search.',dqClaimedSection:'Completed quests',steamSearchPlaceholder:'Search by name or AppID...',dqSearchPlaceholder:'Search quest...',dqAddAccount:'+ Add Account',dqConnected:'Discord: connected',dqDisconnected:'Discord: not connected',dqSaved:'Discord token saved',dqRemoved:'Discord token removed',dqStarted:'Quest automation started',dqStopped:'Quest automation stopped',dqRunning:'Running',dqClaimed:'Claimed',dqCompleted:'Completed',dqAvailable:'Available',dqEnrolled:'Enrolled',dqNotEnrolled:'Not enrolled',dqEnrollBtn:'Accept',dqEnrolledSuccess:'Quest accepted',dqStartQuest:'Start',dqReward:'Reward',dqDuration:'Duration',min:'min',sec:'sec'
+    tabSteam:'Steam Cards',tabDiscord:'Discord Quests',dqSafeTitle:'Anti-Detection Guard Active:',dqSafeDesc:'Official Discord Desktop client signature, X-Super-Properties, natural timing jitter (27–33s heartbeats), video watch pacing and realistic action delays are enabled. Complete quests without launching heavy games or streaming.',dqTokenTitle:'Discord Authorization',dqTokenHelp:'Enter your Discord User Token. It is stored locally in config.json and used only for official Discord API requests.',dqSaveToken:'Save & Connect',dqRemoveToken:'Disconnect',dqHowToTitle:'How to get your Discord Token?',dqHowToBtn:'Instructions',dqStep1:'Open Discord in your browser (discord.com/app) or desktop app.',dqStep2:'Press Ctrl+Shift+I (or F12) to open Developer Tools.',dqStep3:'Go to the Network tab and filter requests by "api".',dqStep4:'Click any request, find Request Headers, and copy the "authorization" header value.',dqStartAll:'Complete All Quests',dqStop:'Stop Quests',dqRefresh:'Refresh Quests',dqAutoEnroll:'Auto-accept quests before starting',dqMode:'Mode:',dqModeSafe:'Safe (Sequential)',dqModeFast:'Fast (Parallel)',dqFastWarn:'Fast mode: parallel requests',dqVideo:'Video',dqWatch:'Watch',dqQuests:'Active Quests',dqEmpty:'No active quests found or Discord token not configured.',dqNoResults:'No quests match the search.',dqClaimedSection:'Completed quests',steamSearchPlaceholder:'Search by name or AppID...',dqSearchPlaceholder:'Search quest...',dqAddAccount:'+ Add Account',dqConnected:'Discord: connected',dqDisconnected:'Discord: not connected',dqSaved:'Discord token saved',dqRemoved:'Discord token removed',dqStarted:'Quest automation started',dqStopped:'Quest automation stopped',dqRunning:'Running',dqClaimed:'Claimed',dqCompleted:'Completed',dqAvailable:'Available',dqEnrolled:'Enrolled',dqNotEnrolled:'Not enrolled',dqEnrollBtn:'Accept',dqEnrolledSuccess:'Quest accepted',dqStartQuest:'Start',dqReward:'Reward',dqDuration:'Duration',min:'min',sec:'sec'
   },
   ru:{
     subtitle:'Ультимативный геймерский комбайн',signin:'Войти в Steam',saved:'Сохранено',refreshing:'Обновление списка…',started:'Фарм запущен',paused_:'Поставлено на паузу',stopped_:'Остановлено',needLogin:'Сначала войдите в Steam',cookiesOk:'Cookies импортированы, загружаем игры…',loggedOut:'Вы вышли из аккаунта',lost:'Связь с приложением потеряна',quit:'Выход',loginTitle:'Вход в Steam',qrHelp:'Отсканируйте QR-код в мобильном приложении Steam (Steam Guard → «Войти по QR-коду»). Пароль здесь не вводится.',qrBtn:'Показать QR-код',ckHelp:'Запасной вариант: вставьте cookies с steamcommunity.com (браузер → DevTools → Storage → Cookies).',ckBtn:'Импорт cookies',start:'Старт',pause:'Пауза',stop:'Стоп',refresh:'Обновить список',strategy:'Стратегия',batch:'Параллельный (до 32 игр одновременно)',single:'Последовательный (по одной игре)',parallel:'Макс. параллельно',poll:'Проверка каждые (мин)',save:'Сохранить',logout:'Выйти',games:'Игры',name:'Игра',left:'Осталось карт',hours:'Часы',state:'Статус',log:'Лог',
     steamOn:'Steam: запущен',steamOff:'Steam: не запущен',authOn:'Аккаунт: ',authOff:'Не авторизован',running:'Фарм идёт',paused:'Пауза',stopped:'Остановлено',queued:'В очереди',active:'Фармится',done:'Готово',failed:'Ошибка',qrWait:'Ждём сканирования…',qrScanned:'Отсканировано — подтвердите на телефоне…',qrDone:'Вход выполнен',gamesInfo:(n,c)=>`${n} с дропом · осталось карт: ${c}`,nextPoll:'след. проверка',
     addAccount:'+ Добавить аккаунт',removeAccount:'Удалить',switchAccount:'Сменить аккаунт',confirmRemove:'Вы уверены, что хотите удалить этот аккаунт?',accountSwitched:'Аккаунт переключён',accountRemoved:'Аккаунт удалён',steamNotLoggedIn:'Не авторизован',discordNotConnected:'Не подключён',
-    tabSteam:'Карточки Steam',tabDiscord:'Квесты Discord',dqSafeTitle:'Защита от детекта активна:',dqSafeDesc:'Используются реальные заголовки официального Desktop клиента Discord, X-Super-Properties, случайный джиттер запросов (27–33 сек), просмотр видео с таймингами и естественные задержки. Квесты выполняются без запуска игр и стримов.',dqTokenTitle:'Авторизация в Discord',dqTokenHelp:'Введите пользовательский токен Discord. Он сохраняется локально в config.json и отправляется только на официальные серверы Discord.',dqSaveToken:'Сохранить и подключиться',dqRemoveToken:'Отключить',dqHowToTitle:'Как получить токен Discord?',dqHowToBtn:'Инструкция',dqStep1:'Откройте Discord в браузере (discord.com/app) или десктопном клиенте.',dqStep2:'Нажмите Ctrl+Shift+I (или F12), чтобы открыть инструменты разработчика.',dqStep3:'Перейдите на вкладку Network (Сеть) и укажите фильтр "api".',dqStep4:'Кликните на любой запрос, найдите Request Headers и скопируйте значение "authorization".',dqStartAll:'Выполнить все квесты',dqStop:'Остановить квесты',dqRefresh:'Обновить квесты',dqAutoEnroll:'Автоматически принимать квесты перед выполнением',dqQuests:'Доступные квесты',dqEmpty:'Активных квестов не найдено или токен Discord ещё не указан.',dqNoResults:'Квесты по запросу не найдены.',dqClaimedSection:'Завершённые квесты',steamSearchPlaceholder:'Поиск по названию или AppID...',dqSearchPlaceholder:'Поиск квеста...',dqAddAccount:'+ Добавить аккаунт',dqConnected:'Discord: подключён',dqDisconnected:'Discord: не подключён',dqSaved:'Токен Discord сохранён',dqRemoved:'Токен Discord удалён',dqStarted:'Автовыполнение квестов запущено',dqStopped:'Автовыполнение квестов остановлено',dqRunning:'Выполняется',dqClaimed:'Получено',dqCompleted:'Завершён',dqAvailable:'Доступен',dqEnrolled:'Принят',dqNotEnrolled:'Не принят',dqEnrollBtn:'Принять',dqEnrolledSuccess:'Квест успешно принят',dqStartQuest:'Начать',dqReward:'Награда',dqDuration:'Длительность',min:'мин',sec:'сек'
+    tabSteam:'Карточки Steam',tabDiscord:'Квесты Discord',dqSafeTitle:'Защита от детекта активна:',dqSafeDesc:'Используются реальные заголовки официального Desktop клиента Discord, X-Super-Properties, случайный джиттер запросов (27–33 сек), просмотр видео с таймингами и естественные задержки. Квесты выполняются без запуска игр и стримов.',dqTokenTitle:'Авторизация в Discord',dqTokenHelp:'Введите пользовательский токен Discord. Он сохраняется локально в config.json и отправляется только на официальные серверы Discord.',dqSaveToken:'Сохранить и подключиться',dqRemoveToken:'Отключить',dqHowToTitle:'Как получить токен Discord?',dqHowToBtn:'Инструкция',dqStep1:'Откройте Discord в браузере (discord.com/app) или десктопном клиенте.',dqStep2:'Нажмите Ctrl+Shift+I (или F12), чтобы открыть инструменты разработчика.',dqStep3:'Перейдите на вкладку Network (Сеть) и укажите фильтр "api".',dqStep4:'Кликните на любой запрос, найдите Request Headers и скопируйте значение "authorization".',dqStartAll:'Выполнить все квесты',dqStop:'Остановить квесты',dqRefresh:'Обновить квесты',dqAutoEnroll:'Автоматически принимать квесты перед выполнением',dqMode:'Режим:',dqModeSafe:'Безопасный (по очереди)',dqModeFast:'Быстрый (параллельно)',dqFastWarn:'Быстрый режим: параллельные запросы',dqVideo:'Видео',dqWatch:'Смотреть',dqQuests:'Доступные квесты',dqEmpty:'Активных квестов не найдено или токен Discord ещё не указан.',dqNoResults:'Квесты по запросу не найдены.',dqClaimedSection:'Завершённые квесты',steamSearchPlaceholder:'Поиск по названию или AppID...',dqSearchPlaceholder:'Поиск квеста...',dqAddAccount:'+ Добавить аккаунт',dqConnected:'Discord: подключён',dqDisconnected:'Discord: не подключён',dqSaved:'Токен Discord сохранён',dqRemoved:'Токен Discord удалён',dqStarted:'Автовыполнение квестов запущено',dqStopped:'Автовыполнение квестов остановлено',dqRunning:'Выполняется',dqClaimed:'Получено',dqCompleted:'Завершён',dqAvailable:'Доступен',dqEnrolled:'Принят',dqNotEnrolled:'Не принят',dqEnrollBtn:'Принять',dqEnrolledSuccess:'Квест успешно принят',dqStartQuest:'Начать',dqReward:'Награда',dqDuration:'Длительность',min:'мин',sec:'сек'
   }
 };
 const L = T[(navigator.language||'en').startsWith('ru')?'ru':'en'];
@@ -260,7 +260,7 @@ async function loadDiscordQuests() {
     if (DQ.quests && DQ.quests.length > 0) {
       if (banner) {
         banner.textContent = '⚠️ ' + e.message;
-        banner.hidden = false;
+        banner.hidden = !e.message;
       }
     } else {
       $('dqQuestList').innerHTML = `<div class="empty-hint">${esc(e.message)}</div>`;
@@ -268,11 +268,15 @@ async function loadDiscordQuests() {
   }
 }
 
+function formatTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
 function formatDuration(sec) {
-  if (sec >= 60) {
-    return (sec / 60).toFixed(1) + ' ' + L.min;
-  }
-  return Math.round(sec) + ' ' + L.sec;
+  return formatTime(sec);
 }
 
 function buildQuestCard(q, isRunning) {
@@ -297,6 +301,7 @@ function buildQuestCard(q, isRunning) {
     : `<span class="tag" style="margin-right:4px;">${L.dqNotEnrolled}</span>`;
 
   let statusTag = '', actionBtn = '';
+  const startBtnLabel = q.is_video ? L.dqWatch : L.dqStartQuest;
   if (isClaimed) {
     statusTag = `<span class="tag done">${L.dqClaimed}</span>`;
     actionBtn = '';
@@ -305,25 +310,26 @@ function buildQuestCard(q, isRunning) {
     actionBtn = `<button class="stop" onclick="stopDiscordQuest('${id}')">${L.dqStop}</button>`;
   } else if (isCompleted) {
     statusTag = `<span class="tag ok">${L.dqCompleted}</span>`;
-    actionBtn = `<button class="go" onclick="startDiscordQuest('${id}')">${L.dqStartQuest}</button>`;
+    actionBtn = `<button class="go" onclick="startDiscordQuest('${id}')">${startBtnLabel}</button>`;
   } else {
     statusTag = `<span class="tag">${L.dqAvailable}</span>`;
     const enrollBtn = !isEnrolled ? `<button class="secondary" style="margin-right:6px;" onclick="enrollDiscordQuest('${id}')">${L.dqEnrollBtn}</button>` : '';
-    actionBtn = `${enrollBtn}<button class="go" onclick="startDiscordQuest('${id}')">${L.dqStartQuest}</button>`;
+    actionBtn = `${enrollBtn}<button class="go" onclick="startDiscordQuest('${id}')">${startBtnLabel}</button>`;
   }
 
   const cardClass = isRunning ? 'quest-card running' : (isClaimed ? 'quest-card done' : 'quest-card');
+  const typeLabel = q.is_video ? `${L.dqVideo} (${formatTime(totalSec)})` : `${taskName} · ${formatTime(totalSec)}`;
 
   return `<div class="${cardClass}" id="quest_${id}" data-name="${name.toLowerCase()}" data-task="${taskName.toLowerCase()}">
     <div class="quest-header">
       <div>
-        <div class="quest-title">${name}${rewardBadge}</div>
-        <div class="quest-sub">${taskName} · ${formatDuration(totalSec)}${rewardMsg ? ' · ' + rewardMsg : ''}</div>
+        <div class="quest-title-row"><span class="quest-title">${name}</span>${rewardBadge}</div>
+        <div class="quest-sub">${typeLabel}${rewardMsg ? ' · ' + rewardMsg : ''}</div>
       </div>
       <div class="quest-badges">${enrollTag}${statusTag}${actionBtn}</div>
     </div>
     <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
-    <div class="progress-meta"><span>${formatDuration(progSec)} / ${formatDuration(totalSec)}</span><span>${pct}%</span></div>
+    <div class="progress-meta"><span>${formatTime(progSec)} / ${formatTime(totalSec)}</span><span>${pct}%</span></div>
   </div>`;
 }
 
@@ -396,19 +402,33 @@ $('steamSearch').oninput = function() {
   });
 };
 
+function getDiscordMode() {
+  return ($('dqModeSelect') || {}).value || localStorage.getItem('xmk_dq_mode') || 'safe';
+}
+
+if ($('dqModeSelect')) {
+  const savedMode = localStorage.getItem('xmk_dq_mode') || 'safe';
+  $('dqModeSelect').value = savedMode;
+  if ($('dqFastWarning')) $('dqFastWarning').hidden = (savedMode !== 'fast');
+  $('dqModeSelect').onchange = function() {
+    localStorage.setItem('xmk_dq_mode', this.value);
+    if ($('dqFastWarning')) $('dqFastWarning').hidden = (this.value !== 'fast');
+  };
+}
+
 window.enrollDiscordQuest = async (id) => {
   await act(() => post('discord/enroll', {questId: id}), L.dqEnrolledSuccess);
   await loadDiscordQuests();
 };
 
 window.startDiscordQuest = async (id) => {
-  await act(() => post('discord/start', {questId: id}), L.dqStarted);
+  const mode = getDiscordMode();
+  await act(() => post('discord/start', {questId: id, mode: mode}), L.dqStarted);
   await loadDiscordState();
-  await loadDiscordQuests();
 };
 
 window.stopDiscordQuest = async (id) => {
-  await act(() => post('discord/stop'), L.dqStopped);
+  await act(() => post('discord/stop', {questId: id}), L.dqStopped);
   await loadDiscordState();
 };
 
@@ -451,9 +471,9 @@ $('dqBtnHowTo').onclick = () => {
 };
 
 $('dqBtnStartAll').onclick = async () => {
-  await act(() => post('discord/start', {all: true}), L.dqStarted);
+  const mode = getDiscordMode();
+  await act(() => post('discord/start', {all: true, mode: mode}), L.dqStarted);
   await loadDiscordState();
-  await loadDiscordQuests();
 };
 
 $('dqBtnStopAll').onclick = async () => {
@@ -495,13 +515,14 @@ try {
       DQ.accounts = Array.isArray(st.accounts) ? st.accounts : [];
       DQ.activeId = st.activeId || '';
 
-      // Update real-time progress of running quest without hitting Discord API
-      if (st.current && st.total > 0 && Array.isArray(DQ.quests)) {
-        const runQ = DQ.quests.find(q => q.id === st.current);
-        if (runQ) {
-          runQ.seconds_done = st.elapsed;
-          runQ.seconds_target = st.total;
-          runQ.progress_ratio = st.elapsed / st.total;
+      // Update real-time progress for all running quests without hitting Discord API
+      if (st.progress && Array.isArray(DQ.quests)) {
+        for (const q of DQ.quests) {
+          if (st.progress[q.id]) {
+            q.seconds_done = st.progress[q.id].elapsed;
+            q.seconds_target = st.progress[q.id].total;
+            q.progress_ratio = q.seconds_done / (q.seconds_target || 1);
+          }
         }
       }
 

@@ -39,9 +39,11 @@ type QuestUserStatus struct {
 
 // QuestTaskConfig describes what the user must do for a quest (v1 format).
 type QuestTaskConfig struct {
-	ApplicationID string `json:"application_id"`
-	Duration      int    `json:"stream_duration_requirement_minutes"`
-	TaskType      string `json:"type"` // PLAY_ON_DESKTOP, STREAM_ON_DESKTOP, WATCH_VIDEO, etc.
+	ApplicationID   string  `json:"application_id"`
+	Duration        int     `json:"stream_duration_requirement_minutes"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	Target          float64 `json:"target"`
+	TaskType        string  `json:"type"` // PLAY_ON_DESKTOP, STREAM_ON_DESKTOP, WATCH_VIDEO, etc.
 }
 
 // TaskV2 represents an objective in task_config_v2.
@@ -126,11 +128,24 @@ func (q *Quest) PopulateMetrics() {
 
 	// 1. Determine task from task_config_v2 if available
 	if q.Config.TaskConfigV2 != nil && len(q.Config.TaskConfigV2.Tasks) > 0 {
-		candidates := []string{"WATCH_VIDEO", "WATCH_VIDEO_ON_MOBILE", "PLAY_ON_DESKTOP", "STREAM_ON_DESKTOP", "PLAY_ACTIVITY"}
+		candidates := []string{
+			"WATCH_VIDEO",
+			"WATCH_VIDEO_ON_MOBILE",
+			"WATCH_ON_MOBILE",
+			"VIDEO",
+			"PLAY_ON_DESKTOP",
+			"STREAM_ON_DESKTOP",
+			"PLAY_ACTIVITY",
+		}
 		for _, c := range candidates {
-			if t, ok := q.Config.TaskConfigV2.Tasks[c]; ok {
-				taskName = c
-				target = t.Target
+			for k, t := range q.Config.TaskConfigV2.Tasks {
+				if strings.EqualFold(k, c) {
+					taskName = k
+					target = t.Target
+					break
+				}
+			}
+			if taskName != "" {
 				break
 			}
 		}
@@ -147,9 +162,18 @@ func (q *Quest) PopulateMetrics() {
 	if taskName == "" {
 		taskName = q.Config.TaskConfig.TaskType
 	}
+
+	isVideo := strings.Contains(strings.ToUpper(taskName), "VIDEO") || strings.Contains(strings.ToUpper(taskName), "WATCH")
+
 	if target <= 0 {
-		if q.Config.TaskConfig.Duration > 0 {
+		if q.Config.TaskConfig.Target > 0 {
+			target = q.Config.TaskConfig.Target
+		} else if q.Config.TaskConfig.DurationSeconds > 0 {
+			target = q.Config.TaskConfig.DurationSeconds
+		} else if q.Config.TaskConfig.Duration > 0 {
 			target = float64(q.Config.TaskConfig.Duration * 60)
+		} else if isVideo {
+			target = 30 // 30 sec default for video
 		} else {
 			target = 900 // 15 minutes default
 		}
@@ -157,7 +181,7 @@ func (q *Quest) PopulateMetrics() {
 
 	q.TaskName = taskName
 	q.SecondsTarget = target
-	q.IsVideo = strings.Contains(taskName, "WATCH_VIDEO")
+	q.IsVideo = isVideo
 
 	// Mark claimed status
 	if q.UserStatus != nil && q.UserStatus.ClaimedAt != "" {
@@ -326,17 +350,17 @@ type questsResponse struct {
 	Quests []Quest `json:"quests"`
 }
 
-// filterQuests removes expired quests and marks claimed ones.
+// filterQuests removes genuinely expired quests and marks claimed ones.
 // It returns (active, claimed) slices.
 func filterQuests(all []Quest) (active []Quest, claimed []Quest) {
 	now := time.Now()
 	for _, q := range all {
-		// Check expiry from config.expires_at
+		// Only filter out quests strictly in the past with 1-hour grace window
 		if q.Config.ExpiresAt != "" {
 			if exp, err := time.Parse(time.RFC3339, q.Config.ExpiresAt); err == nil {
-				if now.After(exp) {
+				if now.After(exp.Add(1 * time.Hour)) {
 					q.IsExpired = true
-					continue // skip expired quests entirely
+					continue // skip expired quests
 				}
 			}
 		}

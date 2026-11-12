@@ -36,11 +36,10 @@ type Server struct {
 	// Discord quest support
 	Discord              *discord.Client
 	discordMu            sync.Mutex
-	discordCancel        context.CancelFunc // cancels active queue runner
-	discordCurrent       string             // ID of currently running quest
-	discordElapsed       float64            // Progress seconds for currently running quest
-	discordTotal         float64            // Target seconds for currently running quest
-	discordLastCompleted string             // ID of the quest that completed most recently
+	discordRunners       map[string]context.CancelFunc // active running quest IDs -> cancel
+	discordQueueCancel   context.CancelFunc            // active sequential queue cancel
+	discordProgress      map[string]struct{ Elapsed, Total float64 }
+	discordLastCompleted string // ID of the quest that completed most recently
 }
 
 // InitDiscord creates the Discord client if a token is configured.
@@ -268,11 +267,7 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 		})
 
 		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
-		}
-		s.discordCurrent = ""
+		s.stopDiscordLocked()
 		s.Discord = c
 		s.discordMu.Unlock()
 
@@ -291,11 +286,7 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 			return
 		}
 		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
-		}
-		s.discordCurrent = ""
+		s.stopDiscordLocked()
 
 		var newToken string
 		s.Cfg.Update(func(cfg *config.Store) {
@@ -329,11 +320,7 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 			return
 		}
 		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
-		}
-		s.discordCurrent = ""
+		s.stopDiscordLocked()
 
 		var activeToken string
 		s.Cfg.Update(func(cfg *config.Store) {
@@ -360,11 +347,7 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 	// Logout / remove active Discord account
 	mux.HandleFunc("POST /api/discord/logout", func(w http.ResponseWriter, r *http.Request) {
 		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
-		}
-		s.discordCurrent = ""
+		s.stopDiscordLocked()
 		s.Discord = nil
 		s.discordMu.Unlock()
 
@@ -418,11 +401,12 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 		writeJSON(w, map[string]bool{"ok": true})
 	})
 
-	// Start quest(s) - strictly sequential queue execution
+	// Start quest(s) - Safe (sequential) or Fast (parallel) mode
 	mux.HandleFunc("POST /api/discord/start", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			QuestID string `json:"questId"`
 			All     bool   `json:"all"`
+			Mode    string `json:"mode"` // "safe" or "fast"
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil {
 			http.Error(w, "bad json", 400)
@@ -448,37 +432,70 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 			}
 		}
 
-		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
-		}
-		s.discordCurrent = ""
-
 		if len(toRun) == 0 {
-			s.discordMu.Unlock()
-			s.publishDiscordState()
 			writeJSON(w, map[string]bool{"ok": true})
 			return
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		s.discordCancel = cancel
-		s.discordMu.Unlock()
+		s.discordMu.Lock()
+		if s.discordRunners == nil {
+			s.discordRunners = make(map[string]context.CancelFunc)
+		}
+		if s.discordProgress == nil {
+			s.discordProgress = make(map[string]struct{ Elapsed, Total float64 })
+		}
 
-		go s.processDiscordQueue(ctx, toRun)
+		if in.Mode == "fast" {
+			// FAST MODE: parallel execution
+			for _, q := range toRun {
+				if _, running := s.discordRunners[q.ID]; running {
+					continue
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				s.discordRunners[q.ID] = cancel
+				s.discordProgress[q.ID] = struct{ Elapsed, Total float64 }{q.SecondsDone, q.SecondsTarget}
+				go s.runSingleDiscordQuest(ctx, q)
+			}
+		} else {
+			// SAFE MODE:
+			// Cancel active quests first
+			s.stopDiscordLocked()
+
+			if in.All {
+				ctx, cancel := context.WithCancel(context.Background())
+				s.discordQueueCancel = cancel
+				go s.processDiscordQueue(ctx, toRun)
+			} else {
+				q := toRun[0]
+				ctx, cancel := context.WithCancel(context.Background())
+				s.discordRunners[q.ID] = cancel
+				s.discordProgress[q.ID] = struct{ Elapsed, Total float64 }{q.SecondsDone, q.SecondsTarget}
+				go s.runSingleDiscordQuest(ctx, q)
+			}
+		}
+		s.discordMu.Unlock()
+		s.publishDiscordState()
 
 		writeJSON(w, map[string]bool{"ok": true})
 	})
 
-	// Stop all quests
+	// Stop quest(s)
 	mux.HandleFunc("POST /api/discord/stop", func(w http.ResponseWriter, r *http.Request) {
-		s.discordMu.Lock()
-		if s.discordCancel != nil {
-			s.discordCancel()
-			s.discordCancel = nil
+		var in struct {
+			QuestID string `json:"questId"`
 		}
-		s.discordCurrent = ""
+		json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in)
+
+		s.discordMu.Lock()
+		if in.QuestID != "" {
+			if cancel, ok := s.discordRunners[in.QuestID]; ok {
+				cancel()
+				delete(s.discordRunners, in.QuestID)
+				delete(s.discordProgress, in.QuestID)
+			}
+		} else {
+			s.stopDiscordLocked()
+		}
 		s.discordMu.Unlock()
 		s.Eng.Logf("[Discord] Quests stopped")
 		s.publishDiscordState()
@@ -491,13 +508,56 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 	})
 }
 
+func (s *Server) stopDiscordLocked() {
+	if s.discordQueueCancel != nil {
+		s.discordQueueCancel()
+		s.discordQueueCancel = nil
+	}
+	for id, cancel := range s.discordRunners {
+		cancel()
+		delete(s.discordRunners, id)
+		delete(s.discordProgress, id)
+	}
+}
+
+func (s *Server) runSingleDiscordQuest(ctx context.Context, q discord.Quest) {
+	defer func() {
+		s.discordMu.Lock()
+		delete(s.discordRunners, q.ID)
+		delete(s.discordProgress, q.ID)
+		s.discordMu.Unlock()
+		s.publishDiscordState()
+	}()
+
+	s.publishDiscordState()
+	s.Eng.Logf("[Discord] Starting quest: %s (%s)", q.Name(), q.ID)
+
+	err := s.Discord.RunQuest(ctx, q, func(elapsed, total float64) {
+		s.discordMu.Lock()
+		s.discordProgress[q.ID] = struct{ Elapsed, Total float64 }{elapsed, total}
+		s.discordMu.Unlock()
+		s.publishDiscordState()
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			s.Eng.Logf("[Discord] Quest %s canceled", q.Name())
+			return
+		}
+		s.Eng.Logf("[Discord] Quest %s error: %v", q.Name(), err)
+		return
+	}
+
+	s.Eng.Logf("[Discord] Quest %s completed successfully!", q.Name())
+	s.discordMu.Lock()
+	s.discordLastCompleted = q.ID
+	s.discordMu.Unlock()
+	s.publishDiscordState()
+}
+
 func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest) {
 	defer func() {
 		s.discordMu.Lock()
-		s.discordCurrent = ""
-		s.discordElapsed = 0
-		s.discordTotal = 0
-		s.discordCancel = nil
+		s.discordQueueCancel = nil
 		s.discordMu.Unlock()
 		s.publishDiscordState()
 	}()
@@ -509,21 +569,34 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 		default:
 		}
 
+		questCtx, questCancel := context.WithCancel(ctx)
+
 		s.discordMu.Lock()
-		s.discordCurrent = q.ID
-		s.discordElapsed = q.SecondsDone
-		s.discordTotal = q.SecondsTarget
+		if s.discordRunners == nil {
+			s.discordRunners = make(map[string]context.CancelFunc)
+		}
+		if s.discordProgress == nil {
+			s.discordProgress = make(map[string]struct{ Elapsed, Total float64 })
+		}
+		s.discordRunners[q.ID] = questCancel
+		s.discordProgress[q.ID] = struct{ Elapsed, Total float64 }{q.SecondsDone, q.SecondsTarget}
 		s.discordMu.Unlock()
 		s.publishDiscordState()
 
 		s.Eng.Logf("[Discord] [%d/%d] Starting quest: %s (%s)", i+1, len(quests), q.Name(), q.ID)
-		err := s.Discord.RunQuest(ctx, q, func(elapsed, total float64) {
+		err := s.Discord.RunQuest(questCtx, q, func(elapsed, total float64) {
 			s.discordMu.Lock()
-			s.discordElapsed = elapsed
-			s.discordTotal = total
+			s.discordProgress[q.ID] = struct{ Elapsed, Total float64 }{elapsed, total}
 			s.discordMu.Unlock()
 			s.publishDiscordState()
 		})
+
+		s.discordMu.Lock()
+		delete(s.discordRunners, q.ID)
+		delete(s.discordProgress, q.ID)
+		s.discordMu.Unlock()
+		s.publishDiscordState()
+
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				s.Eng.Logf("[Discord] Quest %s canceled", q.Name())
@@ -574,14 +647,18 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 
 func (s *Server) getDiscordState() map[string]any {
 	s.discordMu.Lock()
-	running := []string{}
-	if s.discordCurrent != "" {
-		running = append(running, s.discordCurrent)
+	running := make([]string, 0, len(s.discordRunners))
+	for id := range s.discordRunners {
+		running = append(running, id)
+	}
+	progress := make(map[string]map[string]float64)
+	for id, p := range s.discordProgress {
+		progress[id] = map[string]float64{
+			"elapsed": p.Elapsed,
+			"total":   p.Total,
+		}
 	}
 	hasToken := s.Discord != nil
-	current := s.discordCurrent
-	elapsed := s.discordElapsed
-	total := s.discordTotal
 	lastCompleted := s.discordLastCompleted
 	s.discordMu.Unlock()
 
@@ -606,9 +683,7 @@ func (s *Server) getDiscordState() map[string]any {
 	return map[string]any{
 		"hasToken":      hasToken,
 		"running":       running,
-		"current":       current,
-		"elapsed":       elapsed,
-		"total":         total,
+		"progress":      progress,
 		"lastCompleted": lastCompleted,
 		"accounts":      safeAccounts,
 		"activeId":      activeID,
