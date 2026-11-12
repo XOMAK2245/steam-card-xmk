@@ -156,6 +156,30 @@ func (c *Client) doReq(ctx context.Context, method, path string, body any) (*htt
 	return nil, fmt.Errorf("discord: too many retries")
 }
 
+type questsResponse struct {
+	Quests []Quest `json:"quests"`
+}
+
+// ParseQuests decodes Discord quests from JSON bytes, supporting both {"quests": [...]} and raw array [...].
+func ParseQuests(data []byte) ([]Quest, error) {
+	// 1. Try Discord's standard object format: {"quests": [...]}
+	var res questsResponse
+	if err := json.Unmarshal(data, &res); err == nil && res.Quests != nil {
+		return res.Quests, nil
+	}
+
+	// 2. Try raw array format: [...]
+	var list []Quest
+	if err := json.Unmarshal(data, &list); err == nil {
+		if list == nil {
+			list = []Quest{}
+		}
+		return list, nil
+	}
+
+	return nil, fmt.Errorf("unexpected quests JSON structure")
+}
+
 // FetchQuests retrieves available quests for the authenticated user.
 func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 	resp, err := c.doReq(ctx, "GET", "quests/@me", nil)
@@ -169,11 +193,15 @@ func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 		return nil, fmt.Errorf("discord: fetch quests: %d %s", resp.StatusCode, string(b))
 	}
 
-	var quests []Quest
-	if err := json.NewDecoder(resp.Body).Decode(&quests); err != nil {
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("discord: read quests: %w", err)
+	}
+
+	quests, err := ParseQuests(b)
+	if err != nil {
 		return nil, fmt.Errorf("discord: parse quests: %w", err)
 	}
-	// Ensure non-nil slice for JSON serialization
 	if quests == nil {
 		quests = []Quest{}
 	}

@@ -88,3 +88,45 @@ func TestQuestIsStream(t *testing.T) {
 	}
 }
 
+
+func TestParseQuests(t *testing.T) {
+	// 1. Standard Discord object format
+	objJSON := `{"quests": [{"id": "q1", "config": {"messages": {"quest_name": "Discord Quest 1"}}}]}`
+	qs, err := ParseQuests([]byte(objJSON))
+	if err != nil {
+		t.Fatalf("ParseQuests obj error: %v", err)
+	}
+	if len(qs) != 1 || qs[0].ID != "q1" || qs[0].Name() != "Discord Quest 1" {
+		t.Fatalf("unexpected parsed quests from obj: %+v", qs)
+	}
+
+	// 2. Empty Discord object format
+	emptyObjJSON := `{"quests": []}`
+	qsEmpty, err := ParseQuests([]byte(emptyObjJSON))
+	if err != nil {
+		t.Fatalf("ParseQuests empty obj error: %v", err)
+	}
+	if qsEmpty == nil || len(qsEmpty) != 0 {
+		t.Fatalf("expected empty non-nil slice, got: %+v", qsEmpty)
+	}
+
+	// 3. Fallback raw array format
+	arrJSON := `[{"id": "q2", "config": {"messages": {"quest_name": "Discord Quest 2"}}}]`
+	qsArr, err := ParseQuests([]byte(arrJSON))
+	if err != nil {
+		t.Fatalf("ParseQuests arr error: %v", err)
+	}
+	if len(qsArr) != 1 || qsArr[0].ID != "q2" {
+		t.Fatalf("unexpected parsed quests from arr: %+v", qsArr)
+	}
+
+	// 4. Empty raw array
+	emptyArrJSON := `[]`
+	qsArrEmpty, err := ParseQuests([]byte(emptyArrJSON))
+	if err != nil {
+		t.Fatalf("ParseQuests empty arr error: %v", err)
+	}
+	if qsArrEmpty == nil || len(qsArrEmpty) != 0 {
+		t.Fatalf("expected empty non-nil slice, got: %+v", qsArrEmpty)
+	}
+}
