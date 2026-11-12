@@ -43,11 +43,11 @@ func TestSuperProperties(t *testing.T) {
 func TestDefaultHeaders(t *testing.T) {
 	h := DefaultHeaders("test-token-123")
 	checks := map[string]string{
-		"Authorization":    "test-token-123",
-		"Content-Type":     "application/json",
-		"Accept-Language":  "en-US",
-		"Origin":           "https://discord.com",
-		"Referer":          "https://discord.com/channels/@me",
+		"Authorization":   "test-token-123",
+		"Content-Type":    "application/json",
+		"Accept-Language": "en-US",
+		"Origin":          "https://discord.com",
+		"Referer":         "https://discord.com/channels/@me",
 	}
 	for k, want := range checks {
 		if got := h.Get(k); got != want {
@@ -71,23 +71,89 @@ func TestHeartbeatInterval(t *testing.T) {
 	}
 }
 
-func TestQuestIsStream(t *testing.T) {
-	tests := []struct {
-		taskType string
-		want     bool
-	}{
-		{"PLAY_ON_DESKTOP", false},
-		{"STREAM_ON_DESKTOP", true},
-		{"WATCH_VIDEO", true},
+func TestParseQuestsWithRealProgress(t *testing.T) {
+	// Real-world scenario from Discord API with task_config_v2 and progress map (e.g. 52% on Basketball Zero)
+	realJSON := `{
+		"quests": [
+			{
+				"id": "1306354807490056263",
+				"config": {
+					"messages": {"quest_name": "Basketball Zero"},
+					"task_config_v2": {
+						"tasks": {
+							"PLAY_ON_DESKTOP": {
+								"target": 900
+							}
+						}
+					}
+				},
+				"user_status": {
+					"enrolled_at": "2026-11-12T20:00:00Z",
+					"progress": {
+						"PLAY_ON_DESKTOP": {
+							"value": 468.0
+						}
+					}
+				}
+			},
+			{
+				"id": "1306354807490056264",
+				"config": {
+					"messages": {"quest_name": "KOF: Legend"},
+					"task_config_v2": {
+						"tasks": {
+							"WATCH_VIDEO": {
+								"target": 30
+							}
+						}
+					}
+				},
+				"user_status": null
+			}
+		]
+	}`
+
+	qs, err := ParseQuests([]byte(realJSON))
+	if err != nil {
+		t.Fatalf("ParseQuests error: %v", err)
 	}
-	for _, tt := range tests {
-		q := Quest{Config: QuestConfig{TaskConfig: QuestTaskConfig{TaskType: tt.taskType}}}
-		if got := q.IsStream(); got != tt.want {
-			t.Errorf("IsStream() for %q = %v, want %v", tt.taskType, got, tt.want)
-		}
+	if len(qs) != 2 {
+		t.Fatalf("expected 2 quests, got %d", len(qs))
+	}
+
+	// First quest: Basketball Zero
+	q1 := qs[0]
+	if q1.Name() != "Basketball Zero" {
+		t.Errorf("q1 name = %q, want Basketball Zero", q1.Name())
+	}
+	if q1.SecondsTarget != 900 {
+		t.Errorf("q1 SecondsTarget = %f, want 900", q1.SecondsTarget)
+	}
+	if q1.SecondsDone != 468 {
+		t.Errorf("q1 SecondsDone = %f, want 468", q1.SecondsDone)
+	}
+	if q1.ProgressRatio != 0.52 {
+		t.Errorf("q1 ProgressRatio = %f, want 0.52", q1.ProgressRatio)
+	}
+	if q1.IsVideo {
+		t.Errorf("q1 should not be video")
+	}
+
+	// Second quest: KOF: Legend (Video quest, unenrolled)
+	q2 := qs[1]
+	if q2.Name() != "KOF: Legend" {
+		t.Errorf("q2 name = %q, want KOF: Legend", q2.Name())
+	}
+	if q2.SecondsTarget != 30 {
+		t.Errorf("q2 SecondsTarget = %f, want 30", q2.SecondsTarget)
+	}
+	if q2.SecondsDone != 0 {
+		t.Errorf("q2 SecondsDone = %f, want 0", q2.SecondsDone)
+	}
+	if !q2.IsVideo {
+		t.Errorf("q2 should be video")
 	}
 }
-
 
 func TestParseQuests(t *testing.T) {
 	// 1. Standard Discord object format

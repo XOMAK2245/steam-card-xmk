@@ -203,6 +203,30 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 		writeJSON(w, quests)
 	})
 
+	// Enroll a single quest
+	mux.HandleFunc("POST /api/discord/enroll", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			QuestID string `json:"questId"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil || in.QuestID == "" {
+			http.Error(w, "bad json", 400)
+			return
+		}
+		if s.Discord == nil {
+			http.Error(w, "no discord token", 400)
+			return
+		}
+		s.Eng.Logf("[Discord] Enrolling in quest %s...", in.QuestID)
+		if err := s.Discord.Enroll(r.Context(), in.QuestID); err != nil {
+			s.Eng.Logf("[Discord] Enroll %s failed: %v", in.QuestID, err)
+			http.Error(w, err.Error(), 502)
+			return
+		}
+		s.Eng.Logf("[Discord] Quest %s enrolled successfully", in.QuestID)
+		s.publishDiscordState()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
 	// Start quest(s) - strictly sequential queue execution
 	mux.HandleFunc("POST /api/discord/start", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -298,7 +322,7 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 		s.publishDiscordState()
 
 		s.Eng.Logf("[Discord] [%d/%d] Starting quest: %s (%s)", i+1, len(quests), q.Name(), q.ID)
-		err := s.Discord.RunQuest(ctx, q, func(elapsed, total time.Duration) {
+		err := s.Discord.RunQuest(ctx, q, func(elapsed, total float64) {
 			s.publishDiscordState()
 		})
 		if err != nil {

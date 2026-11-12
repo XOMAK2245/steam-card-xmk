@@ -1,6 +1,6 @@
 # Maintainer: XOMAK2245
 pkgname=steam-card-xmk-bin
-pkgver=0.5.2
+pkgver=0.5.3
 pkgrel=1
 pkgdesc="Cross-platform automated Steam trading card phantom farmer"
 arch=('x86_64')
