@@ -53,7 +53,7 @@ func main() {
 		u := fmt.Sprintf("http://127.0.0.1:%d/", *port)
 		if alive(u) {
 			if !*noBrowser {
-				openApp(u, nil)
+				showExisting(u)
 				time.Sleep(time.Second)
 			}
 			return
@@ -76,9 +76,6 @@ func main() {
 
 	fmt.Println("steam-card-xmk", version)
 	fmt.Println("UI:", url, "(close this program with Ctrl+C or the Quit button)")
-	if !*noBrowser {
-		openApp(url, quit)
-	}
 	if s, _ := cfg.Snapshot(); s.SteamID != "" {
 		eng.FetchOnce()
 		if *autostart {
@@ -88,10 +85,18 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	select {
-	case <-sig:
-	case <-srv.Quit:
+	go func() { <-sig; quit() }()
+
+	switch {
+	case *noBrowser:
+		<-srv.Quit
+	case runNative(url, srv.Quit): // blocks while the native window is open (Windows)
+		quit() // window closed with the cross: shut everything down
+	default:
+		openApp(url, quit) // Chromium --app window, or the default browser
+		<-srv.Quit
 	}
+
 	fmt.Println("Shutting down, stopping phantom games...")
 	eng.Shutdown()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

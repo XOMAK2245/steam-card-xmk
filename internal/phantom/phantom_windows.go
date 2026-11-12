@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"syscall"
@@ -17,12 +18,24 @@ import (
 
 var requiredFiles = []string{"steam_api64.dll"}
 
-// workerCmd re-launches this very executable in hidden worker mode.
+// workerCmd re-launches this very executable in hidden worker mode. The AppID
+// is passed in the child's environment from the start (so the C runtime of
+// steam_api64.dll inherits it) and also via steam_appid.txt in a per-app
+// working directory, which Steam checks as well.
 func workerCmd(dir string, appID uint32) *exec.Cmd {
+	id := strconv.FormatUint(uint64(appID), 10)
+	appDir := filepath.Join(dir, "apps", id)
+	os.MkdirAll(appDir, 0o755)
+	os.WriteFile(filepath.Join(appDir, "steam_appid.txt"), []byte(id), 0o644)
+
 	exe, _ := os.Executable()
-	cmd := exec.Command(exe, "--phantom-worker", strconv.FormatUint(uint64(appID), 10))
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "STEAM_CARD_XMK_WORKER_DIR="+dir)
+	cmd := exec.Command(exe, "--phantom-worker", id)
+	cmd.Dir = appDir
+	cmd.Env = append(os.Environ(),
+		"SteamAppId="+id,
+		"SteamGameId="+id,
+		"STEAM_CARD_XMK_WORKER_DIR="+dir,
+	)
 	return cmd
 }
 

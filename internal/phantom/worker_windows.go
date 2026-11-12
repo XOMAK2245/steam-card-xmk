@@ -3,42 +3,110 @@
 package phantom
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-// RunWorker is the Windows phantom worker (the main executable started with
-// --phantom-worker <appid>). It sets SteamAppId/SteamGameId, loads
-// steam_api64.dll, calls SteamAPI_Init and pumps callbacks until the parent
-// closes our stdin (or dies), then calls SteamAPI_Shutdown.
+// ESteamAPIInitResult values returned by SteamAPI_InitFlat.
+var initResults = map[int32]string{
+	1: "failed (generic)",
+	2: "no Steam client running (start Steam and log in)",
+	3: "version mismatch (Steam client is older than steam_api64.dll)",
+}
+
+func fail(code int, format string, a ...any) int {
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
+	return code
+}
+
+// putCRTEnv mirrors a variable into the C runtime environment: Go's os.Setenv
+// only calls SetEnvironmentVariableW, while steam_api64.dll reads getenv().
+func putCRTEnv(k, v string) {
+	p := windows.NewLazySystemDLL("ucrtbase.dll").NewProc("_putenv_s")
+	if p.Find() != nil {
+		return
+	}
+	kk, _ := windows.BytePtrFromString(k)
+	vv, _ := windows.BytePtrFromString(v)
+	p.Call(uintptr(unsafe.Pointer(kk)), uintptr(unsafe.Pointer(vv)))
+}
+
+// RunWorker is the Windows phantom worker (this executable started with
+// --phantom-worker <appid>). It makes the Steam client believe the game is
+// running: it loads steam_api64.dll, calls SteamAPI_InitFlat (the modern
+// Steamworks SDK has no SteamAPI_Init export), pumps callbacks and, once the
+// parent closes our stdin (or dies), calls SteamAPI_Shutdown.
 func RunWorker(appid string) int {
 	runtime.LockOSThread() // Steamworks wants a stable thread
+
+	// The parent already passes these in the environment; set them again for safety.
 	os.Setenv("SteamAppId", appid)
 	os.Setenv("SteamGameId", appid)
+	putCRTEnv("SteamAppId", appid)
+	putCRTEnv("SteamGameId", appid)
 
 	dir := os.Getenv("STEAM_CARD_XMK_WORKER_DIR")
 	if dir == "" {
 		exe, _ := os.Executable()
 		dir = filepath.Dir(exe)
 	}
-	dll, err := windows.LoadDLL(filepath.Join(dir, "steam_api64.dll"))
+	dllPath := filepath.Join(dir, "steam_api64.dll")
+	dll, err := windows.LoadDLL(dllPath)
 	if err != nil {
-		return 1
+		return fail(1, "cannot load %s: %v", dllPath, err)
 	}
-	initFn, e1 := dll.FindProc("SteamAPI_Init")
-	cbFn, e2 := dll.FindProc("SteamAPI_RunCallbacks")
-	shutFn, e3 := dll.FindProc("SteamAPI_Shutdown")
-	if e1 != nil || e2 != nil || e3 != nil {
-		return 1
+
+	runCb, err := dll.FindProc("SteamAPI_RunCallbacks")
+	if err != nil {
+		return fail(1, "steam_api64.dll: %v", err)
 	}
-	if r, _, _ := initFn.Call(); r&0xff == 0 {
-		return 2
+	shutdown, err := dll.FindProc("SteamAPI_Shutdown")
+	if err != nil {
+		return fail(1, "steam_api64.dll: %v", err)
 	}
+
+	ok := false
+	if flat, err := dll.FindProc("SteamAPI_InitFlat"); err == nil {
+		var msg [1024]byte
+		r, _, _ := flat.Call(uintptr(unsafe.Pointer(&msg[0])))
+		if code := int32(uint32(r)); code == 0 { // k_ESteamAPIInitResult_OK
+			ok = true
+		} else {
+			text := windows.ByteSliceToString(msg[:])
+			desc := initResults[code]
+			if desc == "" {
+				desc = "unknown error"
+			}
+			return fail(2, "SteamAPI_InitFlat failed for AppID %s: code %d, %s: %s", appid, code, desc, text)
+		}
+	} else {
+		// Older SDKs: SteamAPI_Init / SteamAPI_InitSafe return a C++ bool.
+		var tried []string
+		for _, name := range []string{"SteamAPI_InitSafe", "SteamAPI_Init"} {
+			p, err := dll.FindProc(name)
+			if err != nil {
+				tried = append(tried, name+": missing")
+				continue
+			}
+			if r, _, _ := p.Call(); r&0xff != 0 {
+				ok = true
+				break
+			}
+			return fail(2, "%s() returned false for AppID %s (is Steam running and the game owned?)", name, appid)
+		}
+		if !ok {
+			return fail(1, "steam_api64.dll has no usable init function (%v)", tried)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Phantom running for AppID %s\n", appid)
 
 	done := make(chan struct{})
 	go func() {
@@ -50,10 +118,10 @@ func RunWorker(appid string) int {
 	for {
 		select {
 		case <-done:
-			shutFn.Call()
+			shutdown.Call()
 			return 0
 		case <-t.C:
-			cbFn.Call()
+			runCb.Call()
 		}
 	}
 }
