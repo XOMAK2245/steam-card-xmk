@@ -34,10 +34,13 @@ type Server struct {
 	QuitFn func() // safe to call repeatedly; falls back to closing Quit
 
 	// Discord quest support
-	Discord        *discord.Client
-	discordMu      sync.Mutex
-	discordCancel  context.CancelFunc // cancels active queue runner
-	discordCurrent string             // ID of currently running quest
+	Discord              *discord.Client
+	discordMu            sync.Mutex
+	discordCancel        context.CancelFunc // cancels active queue runner
+	discordCurrent       string             // ID of currently running quest
+	discordElapsed       float64            // Progress seconds for currently running quest
+	discordTotal         float64            // Target seconds for currently running quest
+	discordLastCompleted string             // ID of the quest that completed most recently
 }
 
 // InitDiscord creates the Discord client if a token is configured.
@@ -492,6 +495,8 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 	defer func() {
 		s.discordMu.Lock()
 		s.discordCurrent = ""
+		s.discordElapsed = 0
+		s.discordTotal = 0
 		s.discordCancel = nil
 		s.discordMu.Unlock()
 		s.publishDiscordState()
@@ -506,11 +511,17 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 
 		s.discordMu.Lock()
 		s.discordCurrent = q.ID
+		s.discordElapsed = q.SecondsDone
+		s.discordTotal = q.SecondsTarget
 		s.discordMu.Unlock()
 		s.publishDiscordState()
 
 		s.Eng.Logf("[Discord] [%d/%d] Starting quest: %s (%s)", i+1, len(quests), q.Name(), q.ID)
 		err := s.Discord.RunQuest(ctx, q, func(elapsed, total float64) {
+			s.discordMu.Lock()
+			s.discordElapsed = elapsed
+			s.discordTotal = total
+			s.discordMu.Unlock()
 			s.publishDiscordState()
 		})
 		if err != nil {
@@ -519,13 +530,33 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 				return
 			}
 			s.Eng.Logf("[Discord] Quest %s error: %v", q.Name(), err)
-			// If rate limited or auth error, abort the entire queue
-			if strings.Contains(strings.ToLower(err.Error()), "rate limit") || errors.Is(err, discord.ErrUnauthorized) {
-				s.Eng.Logf("[Discord] Stopping quest queue due to rate limit/auth error")
+			// Abort only on invalid token or active >60s cooldown
+			if errors.Is(err, discord.ErrUnauthorized) {
+				s.Eng.Logf("[Discord] Stopping quest queue due to invalid token")
 				return
 			}
+			if strings.Contains(strings.ToLower(err.Error()), "rate limit cooldown active") {
+				s.Eng.Logf("[Discord] Stopping quest queue due to rate limit cooldown")
+				return
+			}
+
+			// If error is task-specific (HTTP 400, unsupported quest type, etc.), DO NOT break queue:
+			// pause 5 seconds and proceed to the next quest!
+			if i < len(quests)-1 {
+				s.Eng.Logf("[Discord] Skipping to next quest in 5s...")
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(5 * time.Second):
+				}
+			}
+			continue
 		} else {
 			s.Eng.Logf("[Discord] Quest %s completed successfully!", q.Name())
+			s.discordMu.Lock()
+			s.discordLastCompleted = q.ID
+			s.discordMu.Unlock()
+			s.publishDiscordState()
 		}
 
 		// Pause between sequential quests (5-10s) with natural jitter
@@ -548,6 +579,10 @@ func (s *Server) getDiscordState() map[string]any {
 		running = append(running, s.discordCurrent)
 	}
 	hasToken := s.Discord != nil
+	current := s.discordCurrent
+	elapsed := s.discordElapsed
+	total := s.discordTotal
+	lastCompleted := s.discordLastCompleted
 	s.discordMu.Unlock()
 
 	accounts := []config.DiscordAccount{}
@@ -569,10 +604,14 @@ func (s *Server) getDiscordState() map[string]any {
 	}
 
 	return map[string]any{
-		"hasToken": hasToken,
-		"running":  running,
-		"accounts": safeAccounts,
-		"activeId": activeID,
+		"hasToken":      hasToken,
+		"running":       running,
+		"current":       current,
+		"elapsed":       elapsed,
+		"total":         total,
+		"lastCompleted": lastCompleted,
+		"accounts":      safeAccounts,
+		"activeId":      activeID,
 	}
 }
 

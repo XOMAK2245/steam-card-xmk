@@ -153,13 +153,16 @@
       <span data-i18n="dqAutoEnroll">Auto-accept quests before starting</span>
     </label>
     <span class="spacer"></span>
-    <input id="dqSearch" class="search-input compact" type="search" data-i18n-placeholder="dqSearchPlaceholder" placeholder="Search quest…">
     <span id="dqSummary" style="color:var(--dim); font-size:12.5px; white-space:nowrap;"></span>
   </section>
 
   <div class="grid">
     <section class="card">
-      <h2><span data-i18n="dqQuests">Active Quests</span> <small id="dqQuestsCount"></small></h2>
+      <div class="card-header-row">
+        <h2><span data-i18n="dqQuests">Active Quests</span> <small id="dqQuestsCount"></small></h2>
+        <input id="dqSearch" class="search-input compact" type="search" data-i18n-placeholder="dqSearchPlaceholder" placeholder="Search quest...">
+      </div>
+      <div id="dqWarningBanner" class="warning-banner" hidden></div>
       <div id="dqQuestList" class="quest-list">
         <div class="empty-hint" data-i18n="dqEmpty">No quests found or Discord not connected yet.</div>
       </div>

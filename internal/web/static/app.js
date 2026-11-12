@@ -252,9 +252,19 @@ async function loadDiscordQuests() {
   try {
     const quests = await api('discord/quests');
     DQ.quests = Array.isArray(quests) ? quests : [];
+    const banner = $('dqWarningBanner');
+    if (banner) banner.hidden = true;
     renderDiscordQuests();
   } catch (e) {
-    $('dqQuestList').innerHTML = `<div class="empty-hint">${esc(e.message)}</div>`;
+    const banner = $('dqWarningBanner');
+    if (DQ.quests && DQ.quests.length > 0) {
+      if (banner) {
+        banner.textContent = '⚠️ ' + e.message;
+        banner.hidden = false;
+      }
+    } else {
+      $('dqQuestList').innerHTML = `<div class="empty-hint">${esc(e.message)}</div>`;
+    }
   }
 }
 
@@ -279,6 +289,8 @@ function buildQuestCard(q, isRunning) {
 
   const pct = Math.min(100, Math.round((progSec / (totalSec || 1)) * 100));
   const rewardMsg = esc(q.config?.reward_config?.messages?.completed || '');
+  const rewardName = q.reward_name || '';
+  const rewardBadge = rewardName ? `<span class="reward-badge">✦ ${esc(rewardName)}</span>` : '';
 
   let enrollTag = isEnrolled
     ? `<span class="tag ok" style="margin-right:4px;">${L.dqEnrolled}</span>`
@@ -305,7 +317,7 @@ function buildQuestCard(q, isRunning) {
   return `<div class="${cardClass}" id="quest_${id}" data-name="${name.toLowerCase()}" data-task="${taskName.toLowerCase()}">
     <div class="quest-header">
       <div>
-        <div class="quest-title">${name}</div>
+        <div class="quest-title">${name}${rewardBadge}</div>
         <div class="quest-sub">${taskName} · ${formatDuration(totalSec)}${rewardMsg ? ' · ' + rewardMsg : ''}</div>
       </div>
       <div class="quest-badges">${enrollTag}${statusTag}${actionBtn}</div>
@@ -482,8 +494,25 @@ try {
       DQ.running = Array.isArray(st.running) ? st.running : [];
       DQ.accounts = Array.isArray(st.accounts) ? st.accounts : [];
       DQ.activeId = st.activeId || '';
+
+      // Update real-time progress of running quest without hitting Discord API
+      if (st.current && st.total > 0 && Array.isArray(DQ.quests)) {
+        const runQ = DQ.quests.find(q => q.id === st.current);
+        if (runQ) {
+          runQ.seconds_done = st.elapsed;
+          runQ.seconds_target = st.total;
+          runQ.progress_ratio = st.elapsed / st.total;
+        }
+      }
+
       updateDiscordHeader();
-      loadDiscordQuests();
+      renderDiscordQuests();
+
+      // Only refresh quest list from server when a quest finishes!
+      if (st.lastCompleted && st.lastCompleted !== DQ.lastCompleted) {
+        DQ.lastCompleted = st.lastCompleted;
+        loadDiscordQuests();
+      }
     } catch (x) {}
   });
   es.onerror = () => { $('pStatus').className = 'pill bad'; $('pStatus').textContent = L.lost; };
@@ -491,7 +520,4 @@ try {
 
 setInterval(() => {
   api('state').then(render).catch(() => {});
-  if (!$('tabDiscord').hidden) {
-    loadDiscordQuests();
-  }
 }, 10000);

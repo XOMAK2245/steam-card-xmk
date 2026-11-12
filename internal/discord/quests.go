@@ -58,11 +58,33 @@ type TaskConfigV2 struct {
 	Tasks map[string]TaskV2 `json:"tasks"`
 }
 
-// QuestReward contains reward description.
-type QuestReward struct {
-	Messages struct {
-		Completed string `json:"completed"`
+// QuestRewardItem holds an individual reward item in reward_config.
+type QuestRewardItem struct {
+	Type       int    `json:"type"`
+	SkuID      string `json:"sku_id"`
+	Asset      string `json:"asset"`
+	RewardName string `json:"reward_name"`
+	Messages   struct {
+		Name string `json:"name"`
 	} `json:"messages"`
+}
+
+// QuestReward contains reward description and details.
+type QuestReward struct {
+	RewardName string `json:"reward_name"`
+	SkuID      string `json:"sku_id"`
+	Messages   struct {
+		Completed  string `json:"completed"`
+		Name       string `json:"name"`
+		RewardName string `json:"reward_name"`
+	} `json:"messages"`
+	Rewards    []QuestRewardItem `json:"rewards"`
+	OrbsReward *struct {
+		Amount int `json:"amount"`
+	} `json:"orbs_reward"`
+	Orbs *struct {
+		Amount int `json:"amount"`
+	} `json:"orbs"`
 }
 
 // QuestConfig holds quest metadata.
@@ -88,6 +110,7 @@ type Quest struct {
 	SecondsTarget float64 `json:"seconds_target"`
 	ProgressRatio float64 `json:"progress_ratio"` // 0.0 to 1.0
 	TaskName      string  `json:"task_name"`      // WATCH_VIDEO, PLAY_ON_DESKTOP, STREAM_ON_DESKTOP, etc.
+	RewardName    string  `json:"reward_name"`    // Short reward badge name, e.g. "840 Orbs"
 	IsVideo       bool    `json:"is_video"`
 	IsClaimed     bool    `json:"is_claimed"`  // already claimed (shown in completed section)
 	IsExpired     bool    `json:"is_expired"`  // quest is past its expiry date
@@ -171,6 +194,39 @@ func (q *Quest) PopulateMetrics() {
 			q.ProgressRatio = 1.0
 		}
 	}
+
+	// 4. Determine RewardName
+	rn := ""
+	rc := q.Config.RewardConfig
+	if rc.Messages.RewardName != "" {
+		rn = rc.Messages.RewardName
+	} else if rc.Messages.Name != "" {
+		rn = rc.Messages.Name
+	} else if rc.RewardName != "" {
+		rn = rc.RewardName
+	} else if len(rc.Rewards) > 0 {
+		for _, r := range rc.Rewards {
+			if r.Messages.Name != "" {
+				rn = r.Messages.Name
+				break
+			}
+			if r.RewardName != "" {
+				rn = r.RewardName
+				break
+			}
+		}
+	}
+	if rn == "" {
+		if rc.OrbsReward != nil && rc.OrbsReward.Amount > 0 {
+			rn = fmt.Sprintf("%d Orbs", rc.OrbsReward.Amount)
+		} else if rc.Orbs != nil && rc.Orbs.Amount > 0 {
+			rn = fmt.Sprintf("%d Orbs", rc.Orbs.Amount)
+		}
+	}
+	if rn == "" && rc.Messages.Completed != "" && len(rc.Messages.Completed) <= 45 {
+		rn = rc.Messages.Completed
+	}
+	q.RewardName = rn
 }
 
 // ---------- Client ----------
@@ -205,7 +261,7 @@ func (c *Client) doReq(ctx context.Context, method, path string, body any) (*htt
 		bodyReader = bytes.NewReader(b)
 	}
 
-	for attempt := 0; attempt < 4; attempt++ {
+	for attempt := 0; attempt < 8; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, method, apiBase+path, bodyReader)
 		if err != nil {
 			return nil, err
@@ -237,13 +293,16 @@ func (c *Client) doReq(ctx context.Context, method, path string, body any) (*htt
 					wait = time.Duration(secs*1000) * time.Millisecond
 				}
 			}
+			// Add 1-2s jitter to avoid colliding on exact rate limit windows
+			wait += time.Duration(1000+rand.IntN(1000)) * time.Millisecond
+
 			if wait > 60*time.Second {
 				mins := int(wait.Minutes())
 				msg := fmt.Sprintf("Discord rate limit cooldown active: please wait %d min before trying again", mins)
 				c.logf("[Discord] ⚠️ %s", msg)
 				return nil, fmt.Errorf("%s", msg)
 			}
-			c.logf("[Discord] Rate limited, waiting %v", wait)
+			c.logf("[Discord] Rate limited (attempt %d/8), waiting %v...", attempt+1, wait.Round(time.Millisecond))
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -469,9 +528,9 @@ func (c *Client) FetchUser(ctx context.Context) (*DiscordUser, error) {
 	return &u, nil
 }
 
-// HeartbeatInterval returns 30 seconds ± random jitter for realistic timing.
+// HeartbeatInterval returns 32-36 seconds for realistic timing avoiding rate limits.
 func HeartbeatInterval() time.Duration {
-	return 30*time.Second + time.Duration(rand.IntN(7)-3)*time.Second // 27-33s
+	return 32*time.Second + time.Duration(rand.IntN(5))*time.Second // 32-36s
 }
 
 // RunQuest runs a quest to completion: enroll (if needed) → progress loop (video or heartbeat) → claim.

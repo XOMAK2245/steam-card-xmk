@@ -591,8 +591,9 @@ pre {
 }
 
 .quest-card.running {
-  border-color: rgba(164, 208, 7, 0.5);
-  background: rgba(91, 163, 43, 0.07);
+  border-color: #a4d007;
+  box-shadow: 0 0 14px rgba(164, 208, 7, 0.3);
+  background: rgba(91, 163, 43, 0.09);
 }
 
 .quest-card.done {
@@ -705,4 +706,47 @@ pre {
 
 details[id="dqClaimedSection"] > .quest-list {
   max-height: 40vh;
+}
+
+/* ---- Card header row & warning banner ---- */
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.card-header-row h2 {
+  margin: 0;
+}
+
+.warning-banner {
+  background: rgba(229, 165, 10, 0.12);
+  border: 1px solid rgba(229, 165, 10, 0.45);
+  color: #ffca4a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Reward badge ---- */
+.reward-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.25), rgba(155, 89, 182, 0.28));
+  border: 1px solid rgba(142, 115, 255, 0.5);
+  color: #d1c4ff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+  letter-spacing: 0.2px;
 }

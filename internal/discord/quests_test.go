@@ -100,9 +100,60 @@ func TestFilterQuests(t *testing.T) {
 func TestHeartbeatInterval(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		d := HeartbeatInterval()
-		if d < 27*time.Second || d > 33*time.Second {
-			t.Fatalf("HeartbeatInterval() = %v, want [27s, 33s]", d)
+		if d < 32*time.Second || d > 36*time.Second {
+			t.Fatalf("HeartbeatInterval() = %v, want [32s, 36s]", d)
 		}
+	}
+}
+
+func TestRewardParsing(t *testing.T) {
+	jsonBlob := `{
+		"quests": [
+			{
+				"id": "q1",
+				"config": {
+					"messages": {"quest_name": "Game 1"},
+					"reward_config": {
+						"messages": {"reward_name": "840 Orbs"}
+					}
+				}
+			},
+			{
+				"id": "q2",
+				"config": {
+					"messages": {"quest_name": "Game 2"},
+					"reward_config": {
+						"rewards": [{"messages": {"name": "Avatar Decoration"}}]
+					}
+				}
+			},
+			{
+				"id": "q3",
+				"config": {
+					"messages": {"quest_name": "Game 3"},
+					"reward_config": {
+						"orbs_reward": {"amount": 500}
+					}
+				}
+			}
+		]
+	}`
+
+	qs, err := ParseQuests([]byte(jsonBlob))
+	if err != nil {
+		t.Fatalf("ParseQuests failed: %v", err)
+	}
+	if len(qs) != 3 {
+		t.Fatalf("expected 3 quests, got %d", len(qs))
+	}
+	if qs[0].RewardName != "840 Orbs" {
+		t.Errorf("q1 RewardName = %q, want 840 Orbs", qs[0].RewardName)
+	}
+	if qs[1].RewardName != "Avatar Decoration" {
+		t.Errorf("q2 RewardName = %q, want Avatar Decoration", qs[1].RewardName)
+	}
+	if qs[2].RewardName != "500 Orbs" {
+		t.Errorf("q3 RewardName = %q, want 500 Orbs", qs[2].RewardName)
 	}
 }
 
