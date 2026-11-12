@@ -10,17 +10,33 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/XOMAK2245/steam-card-xmk/internal/config"
 	"github.com/XOMAK2245/steam-card-xmk/internal/farm"
+	"github.com/XOMAK2245/steam-card-xmk/internal/phantom"
 	"github.com/XOMAK2245/steam-card-xmk/internal/web"
 )
 
 var version = "dev"
 
+func alive(u string) bool {
+	c := http.Client{Timeout: 2 * time.Second}
+	r, err := c.Get(u + "api/state")
+	if err != nil {
+		return false
+	}
+	r.Body.Close()
+	return r.StatusCode == 200
+}
+
 func main() {
+	// Hidden worker mode (Windows): this executable acts as the phantom process.
+	if len(os.Args) >= 3 && os.Args[1] == "--phantom-worker" {
+		os.Exit(phantom.RunWorker(os.Args[2]))
+	}
 	port := flag.Int("port", 47890, "local UI port (falls back to a random one if busy)")
 	noBrowser := flag.Bool("no-browser", false, "do not open the browser automatically")
 	autostart := flag.Bool("autostart", false, "start farming immediately")
@@ -31,17 +47,29 @@ func main() {
 		return
 	}
 
-	cfg := config.Load()
-	eng := farm.New(cfg)
-	srv := &web.Server{Eng: eng, Cfg: cfg, Quit: make(chan struct{})}
-
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *port))
 	if err != nil {
+		// Probably another instance: just show its window and exit.
+		u := fmt.Sprintf("http://127.0.0.1:%d/", *port)
+		if alive(u) {
+			if !*noBrowser {
+				openApp(u, nil)
+				time.Sleep(time.Second)
+			}
+			return
+		}
 		ln, err = net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	cfg := config.Load()
+	eng := farm.New(cfg)
+	srv := &web.Server{Eng: eng, Cfg: cfg, Quit: make(chan struct{})}
+	var quitOnce sync.Once
+	quit := func() { quitOnce.Do(func() { close(srv.Quit) }) }
+	srv.QuitFn = quit
 	url := fmt.Sprintf("http://127.0.0.1:%d/", ln.Addr().(*net.TCPAddr).Port)
 	hs := &http.Server{Handler: srv.Handler()}
 	go hs.Serve(ln)
@@ -49,7 +77,7 @@ func main() {
 	fmt.Println("steam-card-xmk", version)
 	fmt.Println("UI:", url, "(close this program with Ctrl+C or the Quit button)")
 	if !*noBrowser {
-		openBrowser(url)
+		openApp(url, quit)
 	}
 	if s, _ := cfg.Snapshot(); s.SteamID != "" {
 		eng.FetchOnce()

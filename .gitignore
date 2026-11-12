@@ -1,2 +1,3 @@
 dist/
 *.tmp
+internal/embedded/bin/linux/steam_phantom

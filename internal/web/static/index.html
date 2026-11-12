@@ -14,12 +14,13 @@
     <span id="pAuth" class="pill">Account: …</span>
     <span id="pStatus" class="pill">…</span>
   </div>
+  <button id="btnLoginShow" class="secondary" data-i18n="signin">Sign in to Steam</button>
   <button id="btnQuit" class="ghost" data-i18n="quit">Quit</button>
 </header>
 
 <div id="note" class="note" hidden></div>
 
-<section id="loginBox" class="card" hidden>
+<section id="loginBox" class="card">
   <h2 data-i18n="loginTitle">Sign in to Steam</h2>
   <div class="cols">
     <div>
@@ -70,6 +71,7 @@
     <pre id="log"></pre>
   </section>
 </div>
+<div id="toast" class="toast" hidden></div>
 <script src="app.js"></script>
 </body>
 </html>

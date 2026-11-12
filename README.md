@@ -29,32 +29,25 @@
 ## 🚀 Быстрый старт (скачал и запустил в 2 клика)
 
 ### 🪟 Windows 10/11
-1. Перейдите на страницу **[Releases](https://github.com/XOMAK2245/steam-card-xmk/releases/latest)** и скачайте `steam-card-xmk-windows-x86_64.zip`.
-2. Распакуйте архив в любую удобную папку.
-3. Убедитесь, что официальный клиент **Steam запущен**.
-4. Запустите `steam-card-xmk.exe`. В браузере откроется интерфейс управления.
-5. Нажмите **«Показать QR-код»**, отсканируйте его в мобильном приложении Steam (раздел Steam Guard) и нажмите **«Старт»**.
+1. Скачайте **один файл** [`steam-card-xmk.exe`](https://github.com/XOMAK2245/steam-card-xmk/releases/latest/download/steam-card-xmk.exe) со страницы **[Releases](https://github.com/XOMAK2245/steam-card-xmk/releases/latest)** (или `.zip` с этим же файлом).
+2. Убедитесь, что клиент **Steam запущен**, и запустите `steam-card-xmk.exe` двойным кликом. Больше никаких файлов не нужно: `steam_api64.dll` встроена и распаковывается сама в `%LocalAppData%\steam-card-xmk\worker`.
+3. Откроется отдельное окно приложения (через Microsoft Edge, который есть в Windows 10/11). Нажмите **«Войти в Steam»** → **«Показать QR-код»**, отсканируйте его в мобильном Steam и нажмите **«Старт»**.
+4. Для выхода нажмите **«Выход»** или закройте окно: все фантомные процессы завершатся.
+
+### 🐧 Ubuntu, Debian, Fedora, SteamOS и другие дистрибутивы Linux
+1. Скачайте `steam-card-xmk-linux-x86_64.tar.gz` со страницы **[Releases](https://github.com/XOMAK2245/steam-card-xmk/releases/latest)** и распакуйте:
+   ```bash
+   tar -xzf steam-card-xmk-linux-x86_64.tar.gz
+   ./steam-card-xmk-linux-x86_64/steam-card-xmk
+   ```
+2. Это один самодостаточный бинарник: воркер и `libsteam_api.so` встроены и распаковываются в `~/.cache/steam-card-xmk/worker`. Окно открывается как приложение через Chromium / Chrome / Brave / Edge (если ничего из этого нет, откроется браузер по умолчанию).
 
 ### 🐧 Arch Linux / Manjaro
-**Через PKGBUILD:**
 ```bash
-# Скачайте PKGBUILD со страницы релиза:
 curl -LO https://github.com/XOMAK2245/steam-card-xmk/releases/latest/download/PKGBUILD
 makepkg -si
 steam-card-xmk
 ```
-
-### 🐧 Ubuntu, Debian, Fedora, SteamOS и другие дистрибутивы Linux
-1. Скачайте `steam-card-xmk-linux-x86_64.tar.gz` со страницы **[Releases](https://github.com/XOMAK2245/steam-card-xmk/releases/latest)**.
-2. Распакуйте архив:
-   ```bash
-   tar -xvf steam-card-xmk-linux-x86_64.tar.gz
-   cd steam-card-xmk-linux-x86_64
-   ```
-3. Запустите:
-   ```bash
-   ./steam-card-xmk
-   ```
 
 ---
 

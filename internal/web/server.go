@@ -22,10 +22,11 @@ import (
 var staticFS embed.FS
 
 type Server struct {
-	Eng  *farm.Engine
-	Cfg  *config.Store
-	QR   auth.QRLogin
-	Quit chan struct{}
+	Eng    *farm.Engine
+	Cfg    *config.Store
+	QR     auth.QRLogin
+	Quit   chan struct{}
+	QuitFn func() // safe to call repeatedly; falls back to closing Quit
 }
 
 func (s *Server) Handler() http.Handler {
@@ -44,7 +45,16 @@ func (s *Server) Handler() http.Handler {
 	act("pause", s.Eng.Pause)
 	act("stop", s.Eng.Stop)
 	act("refresh", func() { s.Eng.RefreshNow(); s.Eng.FetchOnce() })
-	act("quit", func() { go func() { time.Sleep(200 * time.Millisecond); close(s.Quit) }() })
+	act("quit", func() {
+		go func() {
+			time.Sleep(300 * time.Millisecond) // let the HTTP response go out
+			if s.QuitFn != nil {
+				s.QuitFn()
+			} else {
+				close(s.Quit)
+			}
+		}()
+	})
 	act("logout", func() {
 		s.Eng.Stop()
 		s.Cfg.Update(func(c *config.Store) { c.Session = config.Session{} })

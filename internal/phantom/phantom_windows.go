@@ -4,7 +4,9 @@ package phantom
 
 import (
 	"io"
+	"os"
 	"os/exec"
+	"strconv"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -13,10 +15,16 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-const (
-	workerName = "phantom.exe"
-	libName    = "steam_api64.dll"
-)
+var requiredFiles = []string{"steam_api64.dll"}
+
+// workerCmd re-launches this very executable in hidden worker mode.
+func workerCmd(dir string, appID uint32) *exec.Cmd {
+	exe, _ := os.Executable()
+	cmd := exec.Command(exe, "--phantom-worker", strconv.FormatUint(uint64(appID), 10))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "STEAM_CARD_XMK_WORKER_DIR="+dir)
+	return cmd
+}
 
 var (
 	jobOnce sync.Once

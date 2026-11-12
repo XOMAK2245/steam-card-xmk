@@ -84,6 +84,7 @@ func New(cfg *config.Store) *Engine {
 	e.mgr = phantom.NewManager(st.WorkerDir, e.Logf)
 	e.fetch = e.fetchBadges
 	go e.watchExits()
+	e.Logf("steam-card-xmk ready (worker dir: %s)", e.mgr.Dir())
 	return e
 }
 
@@ -124,7 +125,9 @@ func (e *Engine) Logf(format string, args ...any) {
 func (e *Engine) Logs() []string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return append([]string(nil), e.logs...)
+	out := make([]string, len(e.logs)) // never nil: must encode as [] not null
+	copy(out, e.logs)
+	return out
 }
 
 func (e *Engine) changed() {

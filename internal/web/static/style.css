@@ -26,3 +26,4 @@ th{color:var(--dim);font-weight:500;position:sticky;top:0;background:var(--panel
 tr.active td{background:#14301f}tr.done td{color:var(--dim)}tr.failed td{color:var(--bad)}
 .tag{font-size:12px;padding:1px 8px;border-radius:99px;background:#2a3647}.tag.active{background:var(--ok);color:#04121f}.tag.done{background:#2a3647}.tag.failed{background:var(--bad);color:#04121f}
 pre{margin:0;height:62vh;overflow:auto;background:#0b0f14;border-radius:8px;padding:10px;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.toast{position:fixed;right:16px;bottom:16px;background:#2a3647;border:1px solid var(--line);padding:9px 16px;border-radius:8px;box-shadow:0 4px 18px #0008;max-width:60ch}.toast.err{border-color:var(--bad);color:var(--bad)}.toast.ok{border-color:var(--ok)}

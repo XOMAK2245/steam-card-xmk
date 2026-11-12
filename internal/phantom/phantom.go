@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/XOMAK2245/steam-card-xmk/internal/embedded"
 	"sync"
 	"time"
 )
@@ -39,28 +41,56 @@ type Manager struct {
 
 func NewManager(dir string, logf func(string, ...any)) *Manager {
 	if dir == "" {
-		dir = defaultDir()
+		dir = resolveDir()
 	}
 	return &Manager{dir: dir, procs: map[uint32]*proc{}, stops: map[uint32]bool{}, Log: logf, Events: make(chan ExitEvent, 64)}
 }
 
-func defaultDir() string {
+// resolveDir finds (or creates) the directory holding the worker files:
+//  1. $STEAM_CARD_XMK_WORKER_DIR, if set;
+//  2. the executable's own directory, if it already contains all files;
+//  3. otherwise the embedded files are unpacked into the user cache dir
+//     (~/.cache/steam-card-xmk/worker, %LocalAppData%\\steam-card-xmk\\worker).
+func resolveDir() string {
 	if d := os.Getenv("STEAM_CARD_XMK_WORKER_DIR"); d != "" {
 		return d
 	}
-	exe, err := os.Executable()
+	exeDir := "."
+	if exe, err := os.Executable(); err == nil {
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = r
+		}
+		exeDir = filepath.Dir(exe)
+	}
+	if hasAll(exeDir) {
+		return exeDir
+	}
+	cache, err := os.UserCacheDir()
 	if err != nil {
-		return "."
+		cache = os.TempDir()
 	}
-	if r, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = r
+	dir := filepath.Join(cache, "steam-card-xmk", "worker")
+	if err := embedded.Extract(dir); err != nil {
+		fmt.Fprintln(os.Stderr, "cannot unpack worker files:", err)
 	}
-	return filepath.Dir(exe)
+	return dir
 }
 
-// Check verifies that worker binary and Steamworks library are present.
+func hasAll(dir string) bool {
+	for _, f := range requiredFiles {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// Dir returns the worker directory.
+func (m *Manager) Dir() string { return m.dir }
+
+// Check verifies that the worker files are present.
 func (m *Manager) Check() error {
-	for _, f := range []string{workerName, libName} {
+	for _, f := range requiredFiles {
 		if _, err := os.Stat(filepath.Join(m.dir, f)); err != nil {
 			return fmt.Errorf("missing %s in %s", f, m.dir)
 		}
@@ -77,8 +107,7 @@ func (m *Manager) Start(appID uint32) error {
 	if err := m.Check(); err != nil {
 		return err
 	}
-	cmd := exec.Command(filepath.Join(m.dir, workerName), fmt.Sprint(appID))
-	cmd.Dir = m.dir
+	cmd := workerCmd(m.dir, appID)
 	prepare(cmd)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

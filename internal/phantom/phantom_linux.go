@@ -12,10 +12,16 @@ import (
 	"syscall"
 )
 
-const (
-	workerName = "steam_phantom"
-	libName    = "libsteam_api.so"
-)
+var requiredFiles = []string{"steam_phantom", "libsteam_api.so"}
+
+func workerCmd(dir string, appID uint32) *exec.Cmd {
+	cmd := exec.Command(filepath.Join(dir, "steam_phantom"), strconv.FormatUint(uint64(appID), 10))
+	cmd.Dir = dir
+	return cmd
+}
+
+// RunWorker is only needed on Windows, where the worker is the main executable.
+func RunWorker(appID string) int { return 2 }
 
 func prepare(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
