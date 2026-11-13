@@ -521,3 +521,80 @@ func TestFilterQuestsInvalidOrGraceDate(t *testing.T) {
 		t.Errorf("expected 2 active quests (neither dropped), got %d (active=%+v, claimed=%+v)", len(active), active, claimed)
 	}
 }
+
+func TestEnrollAndSelectPlatform(t *testing.T) {
+	var selectPlatformCalled bool
+	var selectedPlatform float64
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/enroll") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"enrolled":true}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "select-platform") || strings.Contains(r.URL.Path, "select_platform") {
+			selectPlatformCalled = true
+			var body map[string]any
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &body)
+			if p, ok := body["platform"].(float64); ok {
+				selectedPlatform = p
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok":true}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	oldBase := apiBase
+	apiBase = ts.URL + "/"
+	defer func() { apiBase = oldBase }()
+
+	c := NewClient("test_token", nil)
+	if err := c.Enroll(context.Background(), "quest_select_pc"); err != nil {
+		t.Fatalf("Enroll failed: %v", err)
+	}
+
+	if !selectPlatformCalled {
+		t.Errorf("expected select-platform to be called after enroll")
+	}
+	if selectedPlatform != float64(4) {
+		t.Errorf("expected selected platform 4 (PC), got %v", selectedPlatform)
+	}
+}
+
+func TestFetchQuestsIncludesDiscover(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "quests/@me") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quests":[{"id":"q_me","config":{"messages":{"quest_name":"Game Me"}}}]}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "quests/discover") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quests":[{"id":"q_disc","config":{"messages":{"quest_name":"GTA VI Promo"},"task_config_v2":{"tasks":{"WATCH_VIDEO":{"target":30}}}}}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	oldBase := apiBase
+	apiBase = ts.URL + "/"
+	defer func() { apiBase = oldBase }()
+
+	c := NewClient("test_token", nil)
+	qs, err := c.FetchQuests(context.Background())
+	if err != nil {
+		t.Fatalf("FetchQuests failed: %v", err)
+	}
+
+	if len(qs) != 2 {
+		t.Fatalf("expected 2 quests (1 from @me + 1 from discover), got %d", len(qs))
+	}
+	if qs[1].ID != "q_disc" || !qs[1].IsVideo {
+		t.Errorf("expected q_disc to be video quest, got %+v", qs[1])
+	}
+}

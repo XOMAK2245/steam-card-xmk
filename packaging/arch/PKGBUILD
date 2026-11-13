@@ -1,6 +1,6 @@
 # Maintainer: XOMAK2245
 pkgname=steam-card-xmk-bin
-pkgver=0.6.7
+pkgver=0.6.8
 pkgrel=1
 pkgdesc="XMK Suite – ultimate gamer utility: Steam card farmer + Discord quest automation"
 arch=('x86_64')

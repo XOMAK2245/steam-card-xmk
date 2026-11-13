@@ -518,7 +518,9 @@ func (c *Client) doReq(ctx context.Context, method, path string, body any) (*htt
 }
 
 type questsResponse struct {
-	Quests []Quest `json:"quests"`
+	Quests          []Quest `json:"quests"`
+	DiscoveryQuests []Quest `json:"discovery_quests"`
+	PromotedQuests  []Quest `json:"promoted_quests"`
 }
 
 func parseTimeFlexible(s string) (time.Time, bool) {
@@ -581,11 +583,18 @@ func filterQuests(all []Quest) (active []Quest, claimed []Quest) {
 func ParseQuests(data []byte) ([]Quest, error) {
 	var quests []Quest
 
-	// 1. Try Discord's standard object format: {"quests": [...]}
+	// 1. Try Discord's standard object format: {"quests": [...]}, {"discovery_quests": [...]}, etc.
 	var res questsResponse
-	if err := json.Unmarshal(data, &res); err == nil && res.Quests != nil {
-		quests = res.Quests
-	} else {
+	if err := json.Unmarshal(data, &res); err == nil {
+		if res.Quests != nil {
+			quests = res.Quests
+		} else if res.DiscoveryQuests != nil {
+			quests = res.DiscoveryQuests
+		} else if res.PromotedQuests != nil {
+			quests = res.PromotedQuests
+		}
+	}
+	if quests == nil {
 		// 2. Try raw array format: [...]
 		var list []Quest
 		if err := json.Unmarshal(data, &list); err == nil {
@@ -627,6 +636,28 @@ func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 		return nil, fmt.Errorf("discord: parse quests: %w", err)
 	}
 
+	// Also fetch promo/discover quests (e.g. video quests like GTA VI, Monster Hunter, KOF)
+	knownIDs := make(map[string]bool)
+	for _, q := range all {
+		knownIDs[q.ID] = true
+	}
+
+	if dResp, dErr := c.doReq(ctx, "GET", "quests/discover", nil); dErr == nil {
+		defer dResp.Body.Close()
+		if dResp.StatusCode == 200 {
+			if dB, rErr := io.ReadAll(dResp.Body); rErr == nil {
+				if dQuests, pErr := ParseQuests(dB); pErr == nil {
+					for _, dq := range dQuests {
+						if !knownIDs[dq.ID] {
+							knownIDs[dq.ID] = true
+							all = append(all, dq)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Filter: separate active from claimed; drop expired entirely
 	active, claimed := filterQuests(all)
 
@@ -638,7 +669,7 @@ func (c *Client) FetchQuests(ctx context.Context) ([]Quest, error) {
 	return result, nil
 }
 
-// Enroll accepts a quest (with realistic delay).
+// Enroll accepts a quest (with realistic delay) and confirms desktop platform if required.
 func (c *Client) Enroll(ctx context.Context, questID string) error {
 	jitter := time.Duration(1000+rand.IntN(2000)) * time.Millisecond
 	select {
@@ -659,6 +690,44 @@ func (c *Client) Enroll(ctx context.Context, questID string) error {
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("discord: enroll %s: HTTP %d: %s", questID, resp.StatusCode, string(b))
+	}
+
+	// Post-enroll: call select-platform / select_platform endpoint to lock PC platform
+	_ = c.SelectPlatform(ctx, questID, 4)
+
+	return nil
+}
+
+// SelectPlatform confirms target platform (e.g. 4 = PC) for multi-platform quests.
+func (c *Client) SelectPlatform(ctx context.Context, questID string, platform int) error {
+	body := map[string]any{"platform": platform}
+	endpoints := []string{
+		"quests/" + questID + "/select-platform",
+		"quests/" + questID + "/select_platform",
+	}
+	for _, ep := range endpoints {
+		resp, err := c.doReq(ctx, "POST", ep, body)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode < 400 {
+				c.logf("[Discord] Quest %s platform selected (%d)", questID, platform)
+				return nil
+			}
+		}
+	}
+	// Fallback to platform: 0 if 4 was rejected
+	if platform != 0 {
+		bodyZero := map[string]any{"platform": 0}
+		for _, ep := range endpoints {
+			resp, err := c.doReq(ctx, "POST", ep, bodyZero)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode < 400 {
+					c.logf("[Discord] Quest %s platform selected (0)", questID)
+					return nil
+				}
+			}
+		}
 	}
 	return nil
 }
