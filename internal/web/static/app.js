@@ -300,18 +300,29 @@ function extractQuestReward(q) {
   if (rc.orbs?.amount > 0) return `${rc.orbs.amount} Orbs`;
 
   const pool = [
+    rc.messages?.reward_name,
+    rc.messages?.name,
     rc.messages?.completed,
     q.config?.description,
     q.config?.messages?.quest_name,
+    q.config?.messages?.game_title,
     q.config?.assets?.title
   ].filter(Boolean).join(' ');
 
-  const orbs = pool.match(/\b(\d+[\s\u00a0]*orbs?)\b/i);
-  if (orbs) return orbs[1].trim();
+  const orbs = pool.match(/(?:[«"']|\s|^)(\d+[\s\u00a0]*Orbs?|[\d,]+\s*Orbs?)(?:[»"']|\s|$)/i);
+  if (orbs) {
+    const clean = orbs[1].replace(/^[«"'\s]+|[»"'\s]+$/g, '').trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2 && parts[1].toLowerCase() === 'orbs') {
+      return `${parts[0]} Orbs`;
+    }
+    return clean;
+  }
 
-  const kw = pool.match(/\b((?:[A-Za-z0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle))\b/i);
+  const kw = pool.match(/(?:[«"']|\s|^)((?:[A-Za-zА-Яа-я0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle|Чертеж|Чертёж|Украшение|Декорация|Эффект))(?:[»"']|\s|$)/i);
   if (kw) {
-    const cleaned = kw[1].replace(/^(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim)\s+/i, '').trim();
+    let cleaned = kw[1].replace(/^(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim|получить|забрать|получите|заберите|награда|награду)\s+/i, '');
+    cleaned = cleaned.replace(/^[«"'\s]+|[»"'\s]+$/g, '').trim();
     if (cleaned) return cleaned;
   }
 
@@ -324,7 +335,10 @@ function extractQuestReward(q) {
 
 function buildQuestCard(q, isRunning) {
   const id = q.id;
-  const name = esc(q.config?.messages?.quest_name || `Quest #${id}`);
+  const gameTitle = esc(q.game_title || q.config?.messages?.game_title || q.config?.messages?.game_publisher || '');
+  const questName = esc(q.config?.messages?.quest_name || `Quest #${id}`);
+  const displayTitle = gameTitle || questName;
+  const subTitle = (gameTitle && questName && gameTitle.toLowerCase() !== questName.toLowerCase()) ? `${questName} · ` : '';
   const taskName = q.task_name || q.config?.quest_task_config?.type || 'PLAY_ON_DESKTOP';
   const totalSec = q.seconds_target > 0 ? q.seconds_target : (q.config?.quest_task_config?.stream_duration_requirement_minutes || 15) * 60;
   const progSec = q.seconds_done || 0;
@@ -363,11 +377,11 @@ function buildQuestCard(q, isRunning) {
   const cardClass = isRunning ? 'quest-card running' : (isClaimed ? 'quest-card done' : (isCompleted ? 'quest-card completed' : 'quest-card'));
   const typeLabel = q.is_video ? `${L.dqVideo} (${formatTime(totalSec)})` : `${taskName} · ${formatTime(totalSec)}`;
 
-  return `<div class="${cardClass}" id="quest_${id}" data-name="${name.toLowerCase()}" data-task="${taskName.toLowerCase()}">
+  return `<div class="${cardClass}" id="quest_${id}" data-name="${(gameTitle + ' ' + questName).toLowerCase()}" data-task="${taskName.toLowerCase()}">
     <div class="quest-header">
       <div>
-        <div class="quest-title-row"><span class="quest-title">${name}</span>${rewardBadge}</div>
-        <div class="quest-sub">${typeLabel}${rewardMsg ? ' · ' + rewardMsg : ''}</div>
+        <div class="quest-title-row"><span class="quest-title">${displayTitle}</span>${rewardBadge}</div>
+        <div class="quest-sub">${subTitle}${typeLabel}${rewardMsg ? ' · ' + rewardMsg : ''}</div>
       </div>
       <div class="quest-badges">${enrollTag}${statusTag}${actionBtn}</div>
     </div>

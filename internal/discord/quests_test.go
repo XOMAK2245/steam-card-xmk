@@ -328,8 +328,8 @@ func TestEnrollPlatformDesktop(t *testing.T) {
 	if gotBody["location"] != float64(1) {
 		t.Errorf("expected location: 1, got: %v", gotBody["location"])
 	}
-	if gotBody["platform"] != float64(0) {
-		t.Errorf("expected platform: 0 (PC / Desktop), got: %v", gotBody["platform"])
+	if gotBody["platform"] != float64(4) {
+		t.Errorf("expected platform: 4 (PC / Desktop), got: %v", gotBody["platform"])
 	}
 }
 
@@ -339,7 +339,10 @@ func TestExtendedRewardParsing(t *testing.T) {
 			{
 				"id": "q_name",
 				"config": {
-					"messages": {"quest_name": "Game Direct Name"},
+					"messages": {
+						"game_title": "Arknights: Endfield",
+						"quest_name": "New Operator: Argent Flow"
+					},
 					"reward_config": {"name": "Special Skin Bundle"}
 				}
 			},
@@ -353,11 +356,14 @@ func TestExtendedRewardParsing(t *testing.T) {
 				}
 			},
 			{
-				"id": "q_regex_orbs",
+				"id": "q_regex_orbs_ru",
 				"config": {
-					"messages": {"quest_name": "Game Regex Orbs"},
+					"messages": {
+						"game_title": "Arknights: Endfield",
+						"quest_name": "New Operator: Argent Flow"
+					},
 					"reward_config": {
-						"messages": {"completed": "Watch and claim 700 Orbs reward!"}
+						"messages": {"completed": "Получить награду «700 Orbs»"}
 					}
 				}
 			},
@@ -383,11 +389,17 @@ func TestExtendedRewardParsing(t *testing.T) {
 	if qs[0].RewardName != "Special Skin Bundle" {
 		t.Errorf("q_name got %q, want 'Special Skin Bundle'", qs[0].RewardName)
 	}
+	if qs[0].GameTitle != "Arknights: Endfield" {
+		t.Errorf("q_name GameTitle got %q, want 'Arknights: Endfield'", qs[0].GameTitle)
+	}
+	if qs[0].Name() != "Arknights: Endfield" {
+		t.Errorf("q_name Name() got %q, want 'Arknights: Endfield'", qs[0].Name())
+	}
 	if qs[1].RewardName != "Ghost Profile Effect" {
 		t.Errorf("q_reward_list got %q, want 'Ghost Profile Effect'", qs[1].RewardName)
 	}
 	if qs[2].RewardName != "700 Orbs" {
-		t.Errorf("q_regex_orbs got %q, want '700 Orbs'", qs[2].RewardName)
+		t.Errorf("q_regex_orbs_ru got %q, want '700 Orbs'", qs[2].RewardName)
 	}
 	if qs[3].RewardName != "Cyber Weapon Blueprint" {
 		t.Errorf("q_regex_kw got %q, want 'Cyber Weapon Blueprint'", qs[3].RewardName)

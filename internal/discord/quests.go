@@ -122,13 +122,15 @@ type QuestConfig struct {
 	TaskConfigV2  *TaskConfigV2   `json:"task_config_v2"`
 	RewardConfig  QuestReward     `json:"reward_config"`
 	VideoMetadata any             `json:"video_metadata"`
+	VideoID       string          `json:"video_id"`
 	Assets        struct {
 		Title string `json:"title"`
 		Video string `json:"video"`
 	} `json:"assets"`
 	Messages struct {
-		QuestName string `json:"quest_name"`
-		GameTitle string `json:"game_title"`
+		QuestName     string `json:"quest_name"`
+		GameTitle     string `json:"game_title"`
+		GamePublisher string `json:"game_publisher"`
 	} `json:"messages"`
 }
 
@@ -144,19 +146,35 @@ type Quest struct {
 	ProgressRatio float64 `json:"progress_ratio"` // 0.0 to 1.0
 	TaskName      string  `json:"task_name"`      // WATCH_VIDEO, PLAY_ON_DESKTOP, STREAM_ON_DESKTOP, etc.
 	RewardName    string  `json:"reward_name"`    // Short reward badge name, e.g. "840 Orbs"
+	GameTitle     string  `json:"game_title"`     // Human readable game title e.g. "Arknights: Endfield"
 	IsVideo       bool    `json:"is_video"`
 	IsClaimed     bool    `json:"is_claimed"`  // already claimed (shown in completed section)
 	IsExpired     bool    `json:"is_expired"`  // quest is past its expiry date
 }
 
-// Name returns the human-readable quest name.
-func (q Quest) Name() string { return q.Config.Messages.QuestName }
+// Name returns the human-readable quest or game name.
+func (q Quest) Name() string {
+	if q.Config.Messages.GameTitle != "" {
+		return q.Config.Messages.GameTitle
+	}
+	if q.Config.Messages.QuestName != "" {
+		return q.Config.Messages.QuestName
+	}
+	return "Quest #" + q.ID
+}
 
 var (
-	orbsRegex    = regexp.MustCompile(`(?i)\b(\d+[\s\x{00a0}]*orbs?)\b`)
-	keywordRegex = regexp.MustCompile(`(?i)\b((?:[A-Za-z0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle))\b`)
-	verbsRegex   = regexp.MustCompile(`^(?i)(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim)\s+`)
+	orbsRegex    = regexp.MustCompile(`(?i)(?:[«"']|\s|^)(\d+[\s\x{00a0}]*orbs?|[\d,]+\s*orbs?)(?:[»"']|\s|$)`)
+	keywordRegex = regexp.MustCompile(`(?i)(?:[«"']|\s|^)((?:[A-Za-zА-Яа-я0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle|Чертеж|Чертёж|Украшение|Декорация|Эффект))(?:[»"']|\s|$)`)
+	verbsRegex   = regexp.MustCompile(`^(?i)(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim|получить|забрать|получите|заберите|награда|награду)\s+`)
 )
+
+func cleanRewardString(s string) string {
+	s = strings.Trim(s, " \t\r\n«»\"'“”")
+	s = verbsRegex.ReplaceAllString(s, "")
+	s = strings.Trim(s, " \t\r\n«»\"'“”")
+	return s
+}
 
 func (q *Quest) extractReward() string {
 	rc := q.Config.RewardConfig
@@ -201,22 +219,36 @@ func (q *Quest) extractReward() string {
 
 	// 4. Parse from text descriptions
 	textPool := []string{
+		rc.Messages.RewardName,
+		rc.Messages.Name,
+		rc.RewardName,
+		rc.Name,
 		rc.Messages.Completed,
 		q.Config.Description,
 		q.Config.Messages.QuestName,
 		q.Config.Messages.GameTitle,
+		q.Config.Messages.GamePublisher,
 		q.Config.Assets.Title,
 	}
 	for _, txt := range textPool {
 		if txt == "" {
 			continue
 		}
-		if match := orbsRegex.FindString(txt); match != "" {
-			return strings.TrimSpace(match)
+		if sub := orbsRegex.FindStringSubmatch(txt); len(sub) > 1 {
+			val := cleanRewardString(sub[1])
+			if val != "" {
+				parts := strings.Fields(val)
+				if len(parts) >= 2 && strings.EqualFold(parts[1], "orbs") {
+					return parts[0] + " Orbs"
+				}
+				return val
+			}
 		}
-		if match := keywordRegex.FindString(txt); match != "" {
-			res := verbsRegex.ReplaceAllString(strings.TrimSpace(match), "")
-			return strings.TrimSpace(res)
+		if sub := keywordRegex.FindStringSubmatch(txt); len(sub) > 1 {
+			val := cleanRewardString(sub[1])
+			if val != "" {
+				return val
+			}
 		}
 	}
 
@@ -230,6 +262,12 @@ func (q *Quest) extractReward() string {
 
 // PopulateMetrics calculates SecondsDone, SecondsTarget, ProgressRatio and TaskName.
 func (q *Quest) PopulateMetrics() {
+	gt := q.Config.Messages.GameTitle
+	if gt == "" {
+		gt = q.Config.Messages.GamePublisher
+	}
+	q.GameTitle = gt
+
 	taskName := ""
 	var target float64 = 0
 
@@ -237,9 +275,12 @@ func (q *Quest) PopulateMetrics() {
 	if q.Config.TaskConfigV2 != nil && len(q.Config.TaskConfigV2.Tasks) > 0 {
 		candidates := []string{
 			"WATCH_VIDEO",
+			"WATCH_VIDEO_DESKTOP",
+			"WATCH_VIDEO_ON_DESKTOP",
 			"WATCH_VIDEO_ON_MOBILE",
 			"WATCH_ON_MOBILE",
-			"WATCH_VIDEO_DESKTOP",
+			"VIDEO_PLAY",
+			"VIEW_VIDEO",
 			"VIDEO",
 			"PLAY_ON_DESKTOP",
 			"STREAM_ON_DESKTOP",
@@ -272,15 +313,15 @@ func (q *Quest) PopulateMetrics() {
 	}
 
 	upperTask := strings.ToUpper(taskName)
-	isVideo := strings.Contains(upperTask, "VIDEO") || strings.Contains(upperTask, "WATCH")
+	isVideo := strings.Contains(upperTask, "VIDEO") || strings.Contains(upperTask, "WATCH") || strings.Contains(upperTask, "VIEW")
 
 	// Also check if any task in task_config_v2 is video
 	if !isVideo && q.Config.TaskConfigV2 != nil {
 		for k, t := range q.Config.TaskConfigV2.Tasks {
 			uk := strings.ToUpper(k)
-			if strings.Contains(uk, "VIDEO") || strings.Contains(uk, "WATCH") {
+			if strings.Contains(uk, "VIDEO") || strings.Contains(uk, "WATCH") || strings.Contains(uk, "VIEW") {
 				isVideo = true
-				if taskName == "" || (!strings.Contains(strings.ToUpper(taskName), "VIDEO") && !strings.Contains(strings.ToUpper(taskName), "WATCH")) {
+				if taskName == "" || (!strings.Contains(strings.ToUpper(taskName), "VIDEO") && !strings.Contains(strings.ToUpper(taskName), "WATCH") && !strings.Contains(strings.ToUpper(taskName), "VIEW")) {
 					taskName = k
 					if t.GetTarget() > 0 {
 						target = t.GetTarget()
@@ -290,7 +331,7 @@ func (q *Quest) PopulateMetrics() {
 			}
 		}
 	}
-	if !isVideo && (q.Config.VideoMetadata != nil || q.Config.Assets.Video != "") {
+	if !isVideo && (q.Config.VideoMetadata != nil || q.Config.VideoID != "" || q.Config.Assets.Video != "" || strings.Contains(strings.ToUpper(q.Config.TaskConfig.TaskType), "VIDEO") || strings.Contains(strings.ToUpper(q.Config.TaskConfig.TaskType), "WATCH")) {
 		isVideo = true
 	}
 
@@ -475,6 +516,16 @@ func parseTimeFlexible(s string) (time.Time, bool) {
 func filterQuests(all []Quest) (active []Quest, claimed []Quest) {
 	now := time.Now()
 	for _, q := range all {
+		// Video quests (GTA VI, KOF, Monster Hunter, Anno 117) are never excluded by expiry filter
+		if q.IsVideo {
+			if q.IsClaimed {
+				claimed = append(claimed, q)
+			} else {
+				active = append(active, q)
+			}
+			continue
+		}
+
 		// Only filter out quests strictly in the past with a 2-hour grace window.
 		// If date cannot be parsed or timezone is uncertain, do NOT filter the quest out.
 		if q.Config.ExpiresAt != "" {
@@ -567,7 +618,7 @@ func (c *Client) Enroll(ctx context.Context, questID string) error {
 
 	body := map[string]any{
 		"location": 1,
-		"platform": 0, // 0 = DESKTOP / PC
+		"platform": 4, // 4 = PC / DESKTOP in Discord API
 	}
 	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/enroll", body)
 	if err != nil {
