@@ -406,6 +406,46 @@ func TestExtendedRewardParsing(t *testing.T) {
 	}
 }
 
+func TestRewardsConfigPlural(t *testing.T) {
+	jsonBlob := `{
+		"quests": [
+			{
+				"id": "q_plural",
+				"config": {
+					"messages": {
+						"game_title": "Arknights: Endfield",
+						"quest_name": "New Operator: Argent Flow"
+					},
+					"rewards_config": {
+						"rewards": [
+							{
+								"type": 0,
+								"messages": {
+									"name": "700 Orbs"
+								}
+							}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	qs, err := ParseQuests([]byte(jsonBlob))
+	if err != nil {
+		t.Fatalf("ParseQuests failed: %v", err)
+	}
+	if len(qs) != 1 {
+		t.Fatalf("expected 1 quest, got %d", len(qs))
+	}
+	if qs[0].RewardName != "700 Orbs" {
+		t.Errorf("expected RewardName '700 Orbs', got %q", qs[0].RewardName)
+	}
+	if qs[0].GameTitle != "Arknights: Endfield" {
+		t.Errorf("expected GameTitle 'Arknights: Endfield', got %q", qs[0].GameTitle)
+	}
+}
+
 func TestVideoQuestDetectionExtended(t *testing.T) {
 	jsonBlob := `{
 		"quests": [

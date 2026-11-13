@@ -120,7 +120,8 @@ type QuestConfig struct {
 	Description   string          `json:"description"`
 	TaskConfig    QuestTaskConfig `json:"quest_task_config"`
 	TaskConfigV2  *TaskConfigV2   `json:"task_config_v2"`
-	RewardConfig  QuestReward     `json:"reward_config"`
+	RewardsConfig QuestReward     `json:"rewards_config"`
+	RewardConfig  QuestReward     `json:"reward_config,omitempty"`
 	VideoMetadata any             `json:"video_metadata"`
 	VideoID       string          `json:"video_id"`
 	Assets        struct {
@@ -177,59 +178,73 @@ func cleanRewardString(s string) string {
 }
 
 func (q *Quest) extractReward() string {
-	rc := q.Config.RewardConfig
+	rcList := []QuestReward{q.Config.RewardsConfig, q.Config.RewardConfig}
 
-	// 1. Direct names on rc
-	candidates := []string{
-		rc.Messages.RewardName,
-		rc.Messages.Name,
-		rc.RewardName,
-		rc.Name,
-	}
-	for _, c := range candidates {
-		if strings.TrimSpace(c) != "" {
-			return strings.TrimSpace(c)
-		}
-	}
-
-	// 2. Rewards and RewardList arrays
-	itemList := append([]QuestRewardItem{}, rc.Rewards...)
-	itemList = append(itemList, rc.RewardList...)
-	for _, r := range itemList {
-		itemCandidates := []string{
-			r.Messages.RewardName,
-			r.Messages.Name,
-			r.RewardName,
-			r.Name,
-		}
-		for _, c := range itemCandidates {
-			if strings.TrimSpace(c) != "" {
-				return strings.TrimSpace(c)
+	for _, rc := range rcList {
+		// 1. Check rewards array first (rewards_config.rewards[0].messages.name)
+		itemList := append([]QuestRewardItem{}, rc.Rewards...)
+		itemList = append(itemList, rc.RewardList...)
+		for _, r := range itemList {
+			itemCandidates := []string{
+				r.Messages.Name,
+				r.Messages.RewardName,
+				r.RewardName,
+				r.Name,
+			}
+			for _, c := range itemCandidates {
+				if strings.TrimSpace(c) != "" {
+					cleaned := cleanRewardString(c)
+					if cleaned != "" {
+						return cleaned
+					}
+				}
 			}
 		}
-	}
 
-	// 3. Orbs objects
-	if rc.OrbsReward != nil && rc.OrbsReward.Amount > 0 {
-		return fmt.Sprintf("%d Orbs", rc.OrbsReward.Amount)
-	}
-	if rc.Orbs != nil && rc.Orbs.Amount > 0 {
-		return fmt.Sprintf("%d Orbs", rc.Orbs.Amount)
+		// 2. Direct names on rc
+		candidates := []string{
+			rc.Messages.RewardName,
+			rc.Messages.Name,
+			rc.RewardName,
+			rc.Name,
+		}
+		for _, c := range candidates {
+			if strings.TrimSpace(c) != "" {
+				cleaned := cleanRewardString(c)
+				if cleaned != "" {
+					return cleaned
+				}
+			}
+		}
+
+		// 3. Orbs objects
+		if rc.OrbsReward != nil && rc.OrbsReward.Amount > 0 {
+			return fmt.Sprintf("%d Orbs", rc.OrbsReward.Amount)
+		}
+		if rc.Orbs != nil && rc.Orbs.Amount > 0 {
+			return fmt.Sprintf("%d Orbs", rc.Orbs.Amount)
+		}
 	}
 
 	// 4. Parse from text descriptions
-	textPool := []string{
-		rc.Messages.RewardName,
-		rc.Messages.Name,
-		rc.RewardName,
-		rc.Name,
-		rc.Messages.Completed,
+	var textPool []string
+	for _, rc := range rcList {
+		textPool = append(textPool,
+			rc.Messages.RewardName,
+			rc.Messages.Name,
+			rc.RewardName,
+			rc.Name,
+			rc.Messages.Completed,
+		)
+	}
+	textPool = append(textPool,
 		q.Config.Description,
 		q.Config.Messages.QuestName,
 		q.Config.Messages.GameTitle,
 		q.Config.Messages.GamePublisher,
 		q.Config.Assets.Title,
-	}
+	)
+
 	for _, txt := range textPool {
 		if txt == "" {
 			continue
@@ -253,8 +268,10 @@ func (q *Quest) extractReward() string {
 	}
 
 	// 5. Fallback short completed message
-	if rc.Messages.Completed != "" && len(rc.Messages.Completed) <= 45 {
-		return strings.TrimSpace(rc.Messages.Completed)
+	for _, rc := range rcList {
+		if rc.Messages.Completed != "" && len(rc.Messages.Completed) <= 45 {
+			return strings.TrimSpace(rc.Messages.Completed)
+		}
 	}
 
 	return ""
@@ -343,10 +360,24 @@ func (q *Quest) PopulateMetrics() {
 		} else if q.Config.TaskConfig.Duration > 0 {
 			target = float64(q.Config.TaskConfig.Duration * 60)
 		} else if isVideo {
-			target = 30 // 30 sec default for video
+			if q.Config.TaskConfigV2 != nil {
+				for _, t := range q.Config.TaskConfigV2.Tasks {
+					if t.GetTarget() > 0 {
+						target = t.GetTarget()
+						break
+					}
+				}
+			}
+			if target <= 0 {
+				target = 30 // 30 sec default for video
+			}
 		} else {
 			target = 900 // 15 minutes default
 		}
+	}
+
+	if isVideo && target <= 0 {
+		target = 30
 	}
 
 	q.TaskName = taskName

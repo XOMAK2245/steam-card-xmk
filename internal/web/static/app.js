@@ -282,7 +282,7 @@ function formatDuration(sec) {
 function extractQuestReward(q) {
   if (q.reward_name && q.reward_name.trim()) return q.reward_name.trim();
 
-  const rc = q.config?.reward_config || {};
+  const rc = q.config?.rewards_config || q.config?.reward_config || {};
   if (rc.reward_name && rc.reward_name.trim()) return rc.reward_name.trim();
   if (rc.name && rc.name.trim()) return rc.name.trim();
   if (rc.messages?.reward_name && rc.messages.reward_name.trim()) return rc.messages.reward_name.trim();
@@ -290,8 +290,8 @@ function extractQuestReward(q) {
 
   const rewards = rc.rewards || rc.reward_list || [];
   for (const r of rewards) {
-    if (r.messages?.reward_name && r.messages.reward_name.trim()) return r.messages.reward_name.trim();
     if (r.messages?.name && r.messages.name.trim()) return r.messages.name.trim();
+    if (r.messages?.reward_name && r.messages.reward_name.trim()) return r.messages.reward_name.trim();
     if (r.reward_name && r.reward_name.trim()) return r.reward_name.trim();
     if (r.name && r.name.trim()) return r.name.trim();
   }
@@ -349,7 +349,7 @@ function buildQuestCard(q, isRunning) {
   const isCompleted = !!uStatus.completed_at || progSec >= totalSec;
 
   const pct = Math.min(100, Math.round((progSec / (totalSec || 1)) * 100));
-  const rewardMsg = esc(q.config?.reward_config?.messages?.completed || '');
+  const rewardMsg = esc(q.config?.rewards_config?.messages?.completed || q.config?.reward_config?.messages?.completed || '');
   const rewardName = extractQuestReward(q);
   const rewardBadge = rewardName ? `<span class="reward-badge">✦ ${esc(rewardName)}</span>` : '';
 
