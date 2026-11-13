@@ -279,6 +279,49 @@ function formatDuration(sec) {
   return formatTime(sec);
 }
 
+function extractQuestReward(q) {
+  if (q.reward_name && q.reward_name.trim()) return q.reward_name.trim();
+
+  const rc = q.config?.reward_config || {};
+  if (rc.reward_name && rc.reward_name.trim()) return rc.reward_name.trim();
+  if (rc.name && rc.name.trim()) return rc.name.trim();
+  if (rc.messages?.reward_name && rc.messages.reward_name.trim()) return rc.messages.reward_name.trim();
+  if (rc.messages?.name && rc.messages.name.trim()) return rc.messages.name.trim();
+
+  const rewards = rc.rewards || rc.reward_list || [];
+  for (const r of rewards) {
+    if (r.messages?.reward_name && r.messages.reward_name.trim()) return r.messages.reward_name.trim();
+    if (r.messages?.name && r.messages.name.trim()) return r.messages.name.trim();
+    if (r.reward_name && r.reward_name.trim()) return r.reward_name.trim();
+    if (r.name && r.name.trim()) return r.name.trim();
+  }
+
+  if (rc.orbs_reward?.amount > 0) return `${rc.orbs_reward.amount} Orbs`;
+  if (rc.orbs?.amount > 0) return `${rc.orbs.amount} Orbs`;
+
+  const pool = [
+    rc.messages?.completed,
+    q.config?.description,
+    q.config?.messages?.quest_name,
+    q.config?.assets?.title
+  ].filter(Boolean).join(' ');
+
+  const orbs = pool.match(/\b(\d+[\s\u00a0]*orbs?)\b/i);
+  if (orbs) return orbs[1].trim();
+
+  const kw = pool.match(/\b((?:[A-Za-z0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle))\b/i);
+  if (kw) {
+    const cleaned = kw[1].replace(/^(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim)\s+/i, '').trim();
+    if (cleaned) return cleaned;
+  }
+
+  if (rc.messages?.completed && rc.messages.completed.length <= 45) {
+    return rc.messages.completed.trim();
+  }
+
+  return '';
+}
+
 function buildQuestCard(q, isRunning) {
   const id = q.id;
   const name = esc(q.config?.messages?.quest_name || `Quest #${id}`);
@@ -293,7 +336,7 @@ function buildQuestCard(q, isRunning) {
 
   const pct = Math.min(100, Math.round((progSec / (totalSec || 1)) * 100));
   const rewardMsg = esc(q.config?.reward_config?.messages?.completed || '');
-  const rewardName = q.reward_name || '';
+  const rewardName = extractQuestReward(q);
   const rewardBadge = rewardName ? `<span class="reward-badge">✦ ${esc(rewardName)}</span>` : '';
 
   let enrollTag = isEnrolled

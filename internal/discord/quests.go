@@ -9,12 +9,13 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const apiBase = "https://discord.com/api/v9/"
+var apiBase = "https://discord.com/api/v9/"
 
 // ErrUnauthorized is returned when the Discord token is invalid or expired.
 var ErrUnauthorized = errors.New("discord: invalid token (401)")
@@ -48,11 +49,30 @@ type QuestTaskConfig struct {
 
 // TaskV2 represents an objective in task_config_v2.
 type TaskV2 struct {
-	Target       float64 `json:"target"` // Target in seconds
-	Applications []struct {
+	Target          float64 `json:"target"` // Target in seconds
+	TargetSeconds   float64 `json:"target_seconds"`
+	Duration        float64 `json:"duration"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	Applications    []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"applications"`
+}
+
+func (t TaskV2) GetTarget() float64 {
+	if t.Target > 0 {
+		return t.Target
+	}
+	if t.TargetSeconds > 0 {
+		return t.TargetSeconds
+	}
+	if t.DurationSeconds > 0 {
+		return t.DurationSeconds
+	}
+	if t.Duration > 0 {
+		return t.Duration
+	}
+	return 0
 }
 
 // TaskConfigV2 represents task_config_v2 structure.
@@ -65,22 +85,26 @@ type QuestRewardItem struct {
 	Type       int    `json:"type"`
 	SkuID      string `json:"sku_id"`
 	Asset      string `json:"asset"`
+	Name       string `json:"name"`
 	RewardName string `json:"reward_name"`
 	Messages   struct {
-		Name string `json:"name"`
+		Name       string `json:"name"`
+		RewardName string `json:"reward_name"`
 	} `json:"messages"`
 }
 
 // QuestReward contains reward description and details.
 type QuestReward struct {
-	RewardName string `json:"reward_name"`
-	SkuID      string `json:"sku_id"`
+	Name       string            `json:"name"`
+	RewardName string            `json:"reward_name"`
+	SkuID      string            `json:"sku_id"`
 	Messages   struct {
 		Completed  string `json:"completed"`
 		Name       string `json:"name"`
 		RewardName string `json:"reward_name"`
 	} `json:"messages"`
 	Rewards    []QuestRewardItem `json:"rewards"`
+	RewardList []QuestRewardItem `json:"reward_list"`
 	OrbsReward *struct {
 		Amount int `json:"amount"`
 	} `json:"orbs_reward"`
@@ -91,13 +115,20 @@ type QuestReward struct {
 
 // QuestConfig holds quest metadata.
 type QuestConfig struct {
-	ExpiresAt    string          `json:"expires_at"`
-	StartsAt     string          `json:"starts_at"`
-	TaskConfig   QuestTaskConfig `json:"quest_task_config"`
-	TaskConfigV2 *TaskConfigV2   `json:"task_config_v2"`
-	RewardConfig QuestReward     `json:"reward_config"`
-	Messages     struct {
+	ExpiresAt     string          `json:"expires_at"`
+	StartsAt      string          `json:"starts_at"`
+	Description   string          `json:"description"`
+	TaskConfig    QuestTaskConfig `json:"quest_task_config"`
+	TaskConfigV2  *TaskConfigV2   `json:"task_config_v2"`
+	RewardConfig  QuestReward     `json:"reward_config"`
+	VideoMetadata any             `json:"video_metadata"`
+	Assets        struct {
+		Title string `json:"title"`
+		Video string `json:"video"`
+	} `json:"assets"`
+	Messages struct {
 		QuestName string `json:"quest_name"`
+		GameTitle string `json:"game_title"`
 	} `json:"messages"`
 }
 
@@ -121,6 +152,82 @@ type Quest struct {
 // Name returns the human-readable quest name.
 func (q Quest) Name() string { return q.Config.Messages.QuestName }
 
+var (
+	orbsRegex    = regexp.MustCompile(`(?i)\b(\d+[\s\x{00a0}]*orbs?)\b`)
+	keywordRegex = regexp.MustCompile(`(?i)\b((?:[A-Za-z0-9-]+\s+){0,3}(?:Decoration|Blueprint|Profile Effect|Avatar Decoration|Badge|Skin|Bundle))\b`)
+	verbsRegex   = regexp.MustCompile(`^(?i)(?:earn|claim|get|unlock|receive|win|watch and earn|watch and claim)\s+`)
+)
+
+func (q *Quest) extractReward() string {
+	rc := q.Config.RewardConfig
+
+	// 1. Direct names on rc
+	candidates := []string{
+		rc.Messages.RewardName,
+		rc.Messages.Name,
+		rc.RewardName,
+		rc.Name,
+	}
+	for _, c := range candidates {
+		if strings.TrimSpace(c) != "" {
+			return strings.TrimSpace(c)
+		}
+	}
+
+	// 2. Rewards and RewardList arrays
+	itemList := append([]QuestRewardItem{}, rc.Rewards...)
+	itemList = append(itemList, rc.RewardList...)
+	for _, r := range itemList {
+		itemCandidates := []string{
+			r.Messages.RewardName,
+			r.Messages.Name,
+			r.RewardName,
+			r.Name,
+		}
+		for _, c := range itemCandidates {
+			if strings.TrimSpace(c) != "" {
+				return strings.TrimSpace(c)
+			}
+		}
+	}
+
+	// 3. Orbs objects
+	if rc.OrbsReward != nil && rc.OrbsReward.Amount > 0 {
+		return fmt.Sprintf("%d Orbs", rc.OrbsReward.Amount)
+	}
+	if rc.Orbs != nil && rc.Orbs.Amount > 0 {
+		return fmt.Sprintf("%d Orbs", rc.Orbs.Amount)
+	}
+
+	// 4. Parse from text descriptions
+	textPool := []string{
+		rc.Messages.Completed,
+		q.Config.Description,
+		q.Config.Messages.QuestName,
+		q.Config.Messages.GameTitle,
+		q.Config.Assets.Title,
+	}
+	for _, txt := range textPool {
+		if txt == "" {
+			continue
+		}
+		if match := orbsRegex.FindString(txt); match != "" {
+			return strings.TrimSpace(match)
+		}
+		if match := keywordRegex.FindString(txt); match != "" {
+			res := verbsRegex.ReplaceAllString(strings.TrimSpace(match), "")
+			return strings.TrimSpace(res)
+		}
+	}
+
+	// 5. Fallback short completed message
+	if rc.Messages.Completed != "" && len(rc.Messages.Completed) <= 45 {
+		return strings.TrimSpace(rc.Messages.Completed)
+	}
+
+	return ""
+}
+
 // PopulateMetrics calculates SecondsDone, SecondsTarget, ProgressRatio and TaskName.
 func (q *Quest) PopulateMetrics() {
 	taskName := ""
@@ -132,6 +239,7 @@ func (q *Quest) PopulateMetrics() {
 			"WATCH_VIDEO",
 			"WATCH_VIDEO_ON_MOBILE",
 			"WATCH_ON_MOBILE",
+			"WATCH_VIDEO_DESKTOP",
 			"VIDEO",
 			"PLAY_ON_DESKTOP",
 			"STREAM_ON_DESKTOP",
@@ -141,7 +249,7 @@ func (q *Quest) PopulateMetrics() {
 			for k, t := range q.Config.TaskConfigV2.Tasks {
 				if strings.EqualFold(k, c) {
 					taskName = k
-					target = t.Target
+					target = t.GetTarget()
 					break
 				}
 			}
@@ -152,7 +260,7 @@ func (q *Quest) PopulateMetrics() {
 		if taskName == "" {
 			for k, t := range q.Config.TaskConfigV2.Tasks {
 				taskName = k
-				target = t.Target
+				target = t.GetTarget()
 				break
 			}
 		}
@@ -163,7 +271,28 @@ func (q *Quest) PopulateMetrics() {
 		taskName = q.Config.TaskConfig.TaskType
 	}
 
-	isVideo := strings.Contains(strings.ToUpper(taskName), "VIDEO") || strings.Contains(strings.ToUpper(taskName), "WATCH")
+	upperTask := strings.ToUpper(taskName)
+	isVideo := strings.Contains(upperTask, "VIDEO") || strings.Contains(upperTask, "WATCH")
+
+	// Also check if any task in task_config_v2 is video
+	if !isVideo && q.Config.TaskConfigV2 != nil {
+		for k, t := range q.Config.TaskConfigV2.Tasks {
+			uk := strings.ToUpper(k)
+			if strings.Contains(uk, "VIDEO") || strings.Contains(uk, "WATCH") {
+				isVideo = true
+				if taskName == "" || (!strings.Contains(strings.ToUpper(taskName), "VIDEO") && !strings.Contains(strings.ToUpper(taskName), "WATCH")) {
+					taskName = k
+					if t.GetTarget() > 0 {
+						target = t.GetTarget()
+					}
+				}
+				break
+			}
+		}
+	}
+	if !isVideo && (q.Config.VideoMetadata != nil || q.Config.Assets.Video != "") {
+		isVideo = true
+	}
 
 	if target <= 0 {
 		if q.Config.TaskConfig.Target > 0 {
@@ -220,37 +349,7 @@ func (q *Quest) PopulateMetrics() {
 	}
 
 	// 4. Determine RewardName
-	rn := ""
-	rc := q.Config.RewardConfig
-	if rc.Messages.RewardName != "" {
-		rn = rc.Messages.RewardName
-	} else if rc.Messages.Name != "" {
-		rn = rc.Messages.Name
-	} else if rc.RewardName != "" {
-		rn = rc.RewardName
-	} else if len(rc.Rewards) > 0 {
-		for _, r := range rc.Rewards {
-			if r.Messages.Name != "" {
-				rn = r.Messages.Name
-				break
-			}
-			if r.RewardName != "" {
-				rn = r.RewardName
-				break
-			}
-		}
-	}
-	if rn == "" {
-		if rc.OrbsReward != nil && rc.OrbsReward.Amount > 0 {
-			rn = fmt.Sprintf("%d Orbs", rc.OrbsReward.Amount)
-		} else if rc.Orbs != nil && rc.Orbs.Amount > 0 {
-			rn = fmt.Sprintf("%d Orbs", rc.Orbs.Amount)
-		}
-	}
-	if rn == "" && rc.Messages.Completed != "" && len(rc.Messages.Completed) <= 45 {
-		rn = rc.Messages.Completed
-	}
-	q.RewardName = rn
+	q.RewardName = q.extractReward()
 }
 
 // ---------- Client ----------
@@ -350,15 +449,37 @@ type questsResponse struct {
 	Quests []Quest `json:"quests"`
 }
 
+func parseTimeFlexible(s string) (time.Time, bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	formats := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 // filterQuests removes genuinely expired quests and marks claimed ones.
 // It returns (active, claimed) slices.
 func filterQuests(all []Quest) (active []Quest, claimed []Quest) {
 	now := time.Now()
 	for _, q := range all {
-		// Only filter out quests strictly in the past with 1-hour grace window
+		// Only filter out quests strictly in the past with a 2-hour grace window.
+		// If date cannot be parsed or timezone is uncertain, do NOT filter the quest out.
 		if q.Config.ExpiresAt != "" {
-			if exp, err := time.Parse(time.RFC3339, q.Config.ExpiresAt); err == nil {
-				if now.After(exp.Add(1 * time.Hour)) {
+			if exp, ok := parseTimeFlexible(q.Config.ExpiresAt); ok {
+				if now.After(exp.Add(2 * time.Hour)) {
 					q.IsExpired = true
 					continue // skip expired quests
 				}
@@ -444,7 +565,10 @@ func (c *Client) Enroll(ctx context.Context, questID string) error {
 	case <-time.After(jitter):
 	}
 
-	body := map[string]any{"location": 1}
+	body := map[string]any{
+		"location": 1,
+		"platform": 0, // 0 = DESKTOP / PC
+	}
 	resp, err := c.doReq(ctx, "POST", "quests/"+questID+"/enroll", body)
 	if err != nil {
 		return err

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -296,5 +299,173 @@ func TestRunQuestAlreadyCompletedNoClaim(t *testing.T) {
 	err := c.RunQuest(context.Background(), q, nil)
 	if err != nil {
 		t.Fatalf("expected nil error for completed quest without calling claim, got: %v", err)
+	}
+}
+
+func TestEnrollPlatformDesktop(t *testing.T) {
+	var gotBody map[string]any
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/enroll") {
+			bodyBytes, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(bodyBytes, &gotBody)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"enrolled":true}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	oldBase := apiBase
+	apiBase = ts.URL + "/"
+	defer func() { apiBase = oldBase }()
+
+	c := NewClient("test_token", nil)
+	if err := c.Enroll(context.Background(), "quest_test_123"); err != nil {
+		t.Fatalf("Enroll failed: %v", err)
+	}
+
+	if gotBody["location"] != float64(1) {
+		t.Errorf("expected location: 1, got: %v", gotBody["location"])
+	}
+	if gotBody["platform"] != float64(0) {
+		t.Errorf("expected platform: 0 (PC / Desktop), got: %v", gotBody["platform"])
+	}
+}
+
+func TestExtendedRewardParsing(t *testing.T) {
+	jsonBlob := `{
+		"quests": [
+			{
+				"id": "q_name",
+				"config": {
+					"messages": {"quest_name": "Game Direct Name"},
+					"reward_config": {"name": "Special Skin Bundle"}
+				}
+			},
+			{
+				"id": "q_reward_list",
+				"config": {
+					"messages": {"quest_name": "Game Reward List"},
+					"reward_config": {
+						"reward_list": [{"name": "Ghost Profile Effect"}]
+					}
+				}
+			},
+			{
+				"id": "q_regex_orbs",
+				"config": {
+					"messages": {"quest_name": "Game Regex Orbs"},
+					"reward_config": {
+						"messages": {"completed": "Watch and claim 700 Orbs reward!"}
+					}
+				}
+			},
+			{
+				"id": "q_regex_kw",
+				"config": {
+					"messages": {"quest_name": "Game Regex Keyword"},
+					"reward_config": {
+						"messages": {"completed": "Earn Cyber Weapon Blueprint"}
+					}
+				}
+			}
+		]
+	}`
+
+	qs, err := ParseQuests([]byte(jsonBlob))
+	if err != nil {
+		t.Fatalf("ParseQuests failed: %v", err)
+	}
+	if len(qs) != 4 {
+		t.Fatalf("expected 4 quests, got %d", len(qs))
+	}
+	if qs[0].RewardName != "Special Skin Bundle" {
+		t.Errorf("q_name got %q, want 'Special Skin Bundle'", qs[0].RewardName)
+	}
+	if qs[1].RewardName != "Ghost Profile Effect" {
+		t.Errorf("q_reward_list got %q, want 'Ghost Profile Effect'", qs[1].RewardName)
+	}
+	if qs[2].RewardName != "700 Orbs" {
+		t.Errorf("q_regex_orbs got %q, want '700 Orbs'", qs[2].RewardName)
+	}
+	if qs[3].RewardName != "Cyber Weapon Blueprint" {
+		t.Errorf("q_regex_kw got %q, want 'Cyber Weapon Blueprint'", qs[3].RewardName)
+	}
+}
+
+func TestVideoQuestDetectionExtended(t *testing.T) {
+	jsonBlob := `{
+		"quests": [
+			{
+				"id": "v1",
+				"config": {
+					"messages": {"quest_name": "GTA VI Trailer"},
+					"task_config_v2": {
+						"tasks": {
+							"WATCH_VIDEO_DESKTOP": {"target": 60}
+						}
+					}
+				}
+			},
+			{
+				"id": "v2",
+				"config": {
+					"messages": {"quest_name": "Monster Hunter Trailer"},
+					"task_config_v2": {
+						"tasks": {
+							"WATCH_VIDEO_ON_MOBILE": {"target_seconds": 30}
+						}
+					}
+				}
+			},
+			{
+				"id": "v3",
+				"config": {
+					"messages": {"quest_name": "Anno 117 Preview"},
+					"video_metadata": {"duration": 45}
+				}
+			}
+		]
+	}`
+
+	qs, err := ParseQuests([]byte(jsonBlob))
+	if err != nil {
+		t.Fatalf("ParseQuests failed: %v", err)
+	}
+	if len(qs) != 3 {
+		t.Fatalf("expected 3 quests, got %d", len(qs))
+	}
+
+	if !qs[0].IsVideo || qs[0].SecondsTarget != 60 {
+		t.Errorf("v1: IsVideo=%v, SecondsTarget=%v, want true/60", qs[0].IsVideo, qs[0].SecondsTarget)
+	}
+	if !qs[1].IsVideo || qs[1].SecondsTarget != 30 {
+		t.Errorf("v2: IsVideo=%v, SecondsTarget=%v, want true/30", qs[1].IsVideo, qs[1].SecondsTarget)
+	}
+	if !qs[2].IsVideo || qs[2].SecondsTarget <= 0 {
+		t.Errorf("v3: IsVideo=%v, SecondsTarget=%v, want true/30+", qs[2].IsVideo, qs[2].SecondsTarget)
+	}
+}
+
+func TestFilterQuestsInvalidOrGraceDate(t *testing.T) {
+	quests := []Quest{
+		{
+			ID: "valid_invalid_date_format",
+			Config: QuestConfig{
+				ExpiresAt: "not-a-valid-date-string",
+			},
+		},
+		{
+			ID: "still_active_near_expiry",
+			Config: QuestConfig{
+				ExpiresAt: time.Now().Add(10 * time.Minute).Format(time.RFC3339),
+			},
+		},
+	}
+
+	active, claimed := filterQuests(quests)
+	if len(active) != 2 {
+		t.Errorf("expected 2 active quests (neither dropped), got %d (active=%+v, claimed=%+v)", len(active), active, claimed)
 	}
 }
