@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -280,5 +281,20 @@ func TestParseQuests(t *testing.T) {
 	}
 	if qsArrEmpty == nil || len(qsArrEmpty) != 0 {
 		t.Fatalf("expected empty non-nil slice, got: %+v", qsArrEmpty)
+	}
+}
+
+func TestRunQuestAlreadyCompletedNoClaim(t *testing.T) {
+	c := NewClient("dummy", nil)
+	q := Quest{
+		ID: "q_done",
+		UserStatus: &QuestUserStatus{
+			EnrolledAt:            "2026-01-01T00:00:00Z",
+			StreamProgressSeconds: 900,
+		},
+	}
+	err := c.RunQuest(context.Background(), q, nil)
+	if err != nil {
+		t.Fatalf("expected nil error for completed quest without calling claim, got: %v", err)
 	}
 }

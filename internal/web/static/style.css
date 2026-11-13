@@ -600,6 +600,31 @@ pre {
   opacity: 0.7;
 }
 
+.quest-card.completed {
+  border-color: rgba(100, 220, 100, 0.4);
+  background: rgba(50, 150, 50, 0.07);
+}
+
+.quest-card.completed .progress-fill {
+  background: linear-gradient(90deg, #4caf50, #80e27e);
+  box-shadow: 0 0 8px rgba(100, 220, 100, 0.5);
+}
+
+.ready-to-claim-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(103, 58, 183, 0.25));
+  border: 1px solid rgba(100, 220, 100, 0.55);
+  box-shadow: 0 0 8px rgba(100, 220, 100, 0.2);
+  color: #a5d6a7;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 .quest-header {
   display: flex;
   justify-content: space-between;

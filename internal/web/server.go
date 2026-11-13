@@ -427,6 +427,10 @@ func (s *Server) registerDiscordRoutes(mux *http.ServeMux) {
 			if q.UserStatus != nil && q.UserStatus.ClaimedAt != "" {
 				continue
 			}
+			// Skip already completed quests (100%)
+			if q.SecondsTarget > 0 && q.SecondsDone >= q.SecondsTarget {
+				continue
+			}
 			if in.All || q.ID == in.QuestID {
 				toRun = append(toRun, q)
 			}
@@ -567,6 +571,12 @@ func (s *Server) processDiscordQueue(ctx context.Context, quests []discord.Quest
 		case <-ctx.Done():
 			return
 		default:
+		}
+
+		// Skip quests that reached 100% (may have completed while queue was running)
+		if q.SecondsTarget > 0 && q.SecondsDone >= q.SecondsTarget {
+			s.Eng.Logf("[Discord] Quest %s already completed (%.0f/%.0f s), skipping...", q.Name(), q.SecondsDone, q.SecondsTarget)
+			continue
 		}
 
 		questCtx, questCancel := context.WithCancel(ctx)

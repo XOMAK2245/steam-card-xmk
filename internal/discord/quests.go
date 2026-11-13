@@ -578,8 +578,8 @@ func (c *Client) RunQuest(ctx context.Context, quest Quest, onProgress func(elap
 
 	alreadyDone := quest.SecondsDone
 	if alreadyDone >= totalSec {
-		c.logf("[Discord] Quest %s already completed (%.0f/%.0f s), claiming reward...", quest.Name(), alreadyDone, totalSec)
-		return c.Claim(ctx, quest.ID)
+		c.logf("[Discord] Quest %s already completed (%.0f/%.0f s). Please claim your reward in Discord client.", quest.Name(), alreadyDone, totalSec)
+		return nil
 	}
 
 	// 2. Video quest path
@@ -618,8 +618,8 @@ func (c *Client) RunQuest(ctx context.Context, quest Quest, onProgress func(elap
 			case <-time.After(wait):
 			}
 		}
-		c.logf("[Discord] Video quest %s watched, claiming reward...", quest.Name())
-		return c.Claim(ctx, quest.ID)
+		c.logf("[Discord] Quest %s completed (100%%)! Please claim your reward in Discord client.", quest.Name())
+		return nil
 	}
 
 	// 3. Game/Stream heartbeat loop
@@ -653,6 +653,6 @@ func (c *Client) RunQuest(ctx context.Context, quest Quest, onProgress func(elap
 		}
 	}
 
-	c.logf("[Discord] Quest %s finished, claiming reward...", quest.Name())
-	return c.Claim(ctx, quest.ID)
+	c.logf("[Discord] Quest %s completed (100%%)! Please claim your reward in Discord client.", quest.Name())
+	return nil
 }
